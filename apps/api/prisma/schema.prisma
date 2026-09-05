@@ -1,0 +1,481 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model InternalUser {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  name               String
+  email              String                 @unique
+  passwordHash       String                 @map("password_hash")
+  status             UserStatus             @default(ACTIVE)
+  createdAt          DateTime               @default(now()) @map("created_at")
+  lastLoginAt        DateTime?              @map("last_login_at")
+  alertRuleUpdates   AlertRule[]            @relation("AlertRuleUpdatedBy")
+  acknowledgedAlerts Alert[]                @relation("AcknowledgedBy")
+  auditLogs          AuditLog[]
+  companiesOwned     Company[]              @relation("InternalOwner")
+  companyChanges     CompanyChangeHistory[]
+  operatedDevices    Device[]               @relation("OperationalOwner")
+  refreshTokens      RefreshToken[]
+  grantedAccess      UserCompanyAccess[]    @relation("GrantedBy")
+  companyAccess      UserCompanyAccess[]    @relation("AccessUser")
+  userRoles          UserRole[]
+
+  @@map("internal_users")
+}
+
+model RefreshToken {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  tokenHash  String       @unique @map("token_hash")
+  revoked    Boolean      @default(false)
+  expiresAt  DateTime     @map("expires_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  replacedBy String?      @map("replaced_by") @db.Uuid
+  user       InternalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Role {
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(uuid()) @db.Uuid
+  code            String           @unique
+  description     String?
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  permissionId String     @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String       @map("user_id") @db.Uuid
+  roleId String       @map("role_id") @db.Uuid
+  role   Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user   InternalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model UserCompanyAccess {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @map("user_id") @db.Uuid
+  companyId   String             @map("company_id") @db.Uuid
+  accessLevel CompanyAccessLevel @map("access_level")
+  grantedById String?            @map("granted_by") @db.Uuid
+  grantedAt   DateTime           @default(now()) @map("granted_at")
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  grantedBy   InternalUser?      @relation("GrantedBy", fields: [grantedById], references: [id])
+  user        InternalUser       @relation("AccessUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@map("user_company_access")
+}
+
+model Holder {
+  id        String    @id @default(uuid()) @db.Uuid
+  fullName  String    @map("full_name")
+  cpf       String?   @unique
+  phone     String?
+  email     String?
+  address   Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+  companies Company[]
+
+  @@map("holders")
+}
+
+model Company {
+  id                  String                      @id @default(uuid()) @db.Uuid
+  name                String
+  legalName           String?                     @map("legal_name")
+  document            String                      @unique
+  documentType        DocumentType                @map("document_type")
+  holderId            String                      @map("holder_id") @db.Uuid
+  phone               String?
+  email               String?
+  zipCode      String? @map("zip_code")
+street       String?
+number       String?
+complement   String?
+neighborhood String?
+city         String?
+state        String?
+  status              CompanyStatus               @default(PENDING)
+  internalOwnerId     String?                     @map("internal_owner_id") @db.Uuid
+  notes               String?
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  activatedAt         DateTime?                   @map("activated_at")
+  deactivatedAt       DateTime?                   @map("deactivated_at")
+  alerts              Alert[]
+  auditLogs           AuditLog[]
+  holder              Holder                      @relation(fields: [holderId], references: [id])
+  internalOwner       InternalUser?               @relation("InternalOwner", fields: [internalOwnerId], references: [id])
+  changeHistory       CompanyChangeHistory[]
+  devices             Device[]
+  driverCompanies     DriverCompany[]
+  marketplaceAccounts CompanyMarketplaceAccount[]
+  userAccess          UserCompanyAccess[]
+
+  @@index([status])
+  @@map("companies")
+}
+
+model Marketplace {
+  id        String                      @id @default(uuid()) @db.Uuid
+  name      String
+  code      String                      @unique
+  active    Boolean                     @default(true)
+  createdAt DateTime                    @default(now()) @map("created_at")
+  accounts  CompanyMarketplaceAccount[]
+
+  @@map("marketplaces")
+}
+
+model CompanyMarketplaceAccount {
+  id            String                   @id @default(uuid()) @db.Uuid
+  companyId     String                   @map("company_id") @db.Uuid
+  marketplaceId String                   @map("marketplace_id") @db.Uuid
+  status        MarketplaceAccountStatus @default(PENDING)
+  notes         String?
+  lastCheckedAt DateTime?                @map("last_checked_at")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+  company       Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  marketplace   Marketplace              @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, marketplaceId])
+  @@index([status])
+  @@map("company_marketplace_accounts")
+}
+
+model Driver {
+  id              String          @id @default(uuid()) @db.Uuid
+  fullName        String          @map("full_name")
+  cpf             String?         @unique
+  phone           String
+  email           String?
+  status          DriverStatus    @default(ACTIVE)
+  notes           String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  driverCompanies DriverCompany[]
+  
+
+  @@index([status])
+  @@map("drivers")
+}
+
+model DriverCompany {
+  driverId  String  @map("driver_id") @db.Uuid
+  companyId String  @map("company_id") @db.Uuid
+  driver    Driver  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@id([driverId, companyId])
+  @@index([companyId])
+  @@map("driver_companies")
+}
+
+model CompanyChangeHistory {
+  id           String        @id @default(uuid()) @db.Uuid
+  companyId    String        @map("company_id") @db.Uuid
+  changedField String        @map("changed_field")
+  oldValue     String?       @map("old_value")
+  newValue     String?       @map("new_value")
+  changedById  String?       @map("changed_by") @db.Uuid
+  changedAt    DateTime      @default(now()) @map("changed_at")
+  changedBy    InternalUser? @relation(fields: [changedById], references: [id])
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_change_history")
+}
+
+model Device {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  companyId          String                  @map("company_id") @db.Uuid
+  driverId           String?                 @map("driver_id") @db.Uuid
+  operationalOwnerId String?                 @map("operational_owner_id") @db.Uuid
+  phoneNumber        String?                 @map("phone_number")
+  imei               String?
+  model              String?
+  manufacturer       String?
+  androidVersion     String?                 @map("android_version")
+  agentVersion       String?                 @map("agent_version")
+  simCarrier         String?                 @map("sim_carrier")
+  connectionType     ConnectionType          @default(UNKNOWN) @map("connection_type")
+  status             DeviceStatus            @default(ACTIVE)
+  deviceApiKeyHash   String?                 @unique @map("device_api_key_hash")
+  deactivationReason String?                 @map("deactivation_reason")
+  activatedAt        DateTime?               @map("activated_at")
+  deactivatedAt      DateTime?               @map("deactivated_at")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  alerts             Alert[]
+  auditLogs          AuditLog[]
+  appStatus          DeviceAppStatus[]
+  currentStatus      DeviceCurrentStatus?
+  events             DeviceEvent[]
+  locationHistory    DeviceLocationHistory[]
+  smsMessages        DeviceSmsMessage[]
+  statusHistory      DeviceStatusHistory[]
+  company            Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  operationalOwner   InternalUser?           @relation("OperationalOwner", fields: [operationalOwnerId], references: [id])
+  notes              String?
+ 
+  @@index([companyId])
+  @@index([status])
+  @@map("devices")
+}
+
+model DeviceCurrentStatus {
+  deviceId String @id @map("device_id") @db.Uuid
+  isOnline           Boolean   @default(false) @map("is_online")
+  batteryLevel       Int?      @map("battery_level")
+  isCharging         Boolean   @default(false) @map("is_charging")
+  storageAvailableMb Int?      @map("storage_available_mb")
+  temperatureCelsius Float?    @map("temperature_celsius")
+  lastSeenAt         DateTime? @map("last_seen_at")
+  lastSyncAt         DateTime? @map("last_sync_at")
+  lastLatitude       Float?    @map("last_latitude")
+  lastLongitude      Float?    @map("last_longitude")
+  lastLocationAt     DateTime? @map("last_location_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  device             Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@map("device_current_status")
+}
+
+model DeviceLocationHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  deviceId   String   @map("device_id") @db.Uuid
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  capturedAt DateTime @map("captured_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, capturedAt])
+  @@map("device_location_history")
+}
+
+model DeviceSmsMessage {
+  id         String    @id @default(uuid()) @db.Uuid
+  deviceId   String    @map("device_id") @db.Uuid
+  sender     String
+  message    String
+  receivedAt DateTime  @map("received_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  readAt     DateTime? @map("read_at")
+  device     Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, receivedAt])
+  @@index([readAt])
+  @@map("device_sms_messages")
+}
+
+model DeviceStatusHistory {
+  id                 String         @id @default(uuid()) @db.Uuid
+  deviceId           String         @map("device_id") @db.Uuid
+  batteryLevel       Int?           @map("battery_level")
+  isCharging         Boolean        @default(false) @map("is_charging")
+  isOnline           Boolean        @default(false) @map("is_online")
+  connectionType     ConnectionType @default(UNKNOWN) @map("connection_type")
+  storageAvailableMb Int?           @map("storage_available_mb")
+  temperatureCelsius Float?         @map("temperature_celsius")
+  recordedAt         DateTime       @default(now()) @map("recorded_at")
+  device             Device         @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, recordedAt])
+  @@map("device_status_history")
+}
+
+model DeviceRequiredApp {
+  id             String            @id @default(uuid()) @db.Uuid
+  appPackageName String            @unique @map("app_package_name")
+  appLabel       String            @map("app_label")
+  isMandatory    Boolean           @default(true) @map("is_mandatory")
+  appStatus      DeviceAppStatus[]
+
+  @@map("device_required_apps")
+}
+
+model DeviceAppStatus {
+  deviceId      String            @map("device_id") @db.Uuid
+  requiredAppId String            @map("required_app_id") @db.Uuid
+  isInstalled   Boolean           @default(false) @map("is_installed")
+  isRunning     Boolean           @default(false) @map("is_running")
+  version       String?
+  checkedAt     DateTime          @default(now()) @map("checked_at")
+  device        Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  requiredApp   DeviceRequiredApp @relation(fields: [requiredAppId], references: [id], onDelete: Cascade)
+
+  @@id([deviceId, requiredAppId])
+  @@map("device_app_status")
+}
+
+model DeviceEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  deviceId    String   @map("device_id") @db.Uuid
+  eventType   String   @map("event_type")
+  description String?
+  metadata    Json?
+  occurredAt  DateTime @default(now()) @map("occurred_at")
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, occurredAt])
+  @@map("device_events")
+}
+
+model AlertRule {
+  id             String        @id @default(uuid()) @db.Uuid
+  code           String        @unique
+  description    String?
+  severity       AlertSeverity
+  thresholdValue Float?        @map("threshold_value")
+  thresholdUnit  String?       @map("threshold_unit")
+  isActive       Boolean       @default(true) @map("is_active")
+  updatedById    String?       @map("updated_by") @db.Uuid
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  updatedBy      InternalUser? @relation("AlertRuleUpdatedBy", fields: [updatedById], references: [id])
+  alerts         Alert[]
+
+  @@map("alert_rules")
+}
+
+model Alert {
+  id               String        @id @default(uuid()) @db.Uuid
+  alertRuleId      String        @map("alert_rule_id") @db.Uuid
+  companyId        String?       @map("company_id") @db.Uuid
+  deviceId         String?       @map("device_id") @db.Uuid
+  severity         AlertSeverity
+  status           AlertStatus   @default(OPEN)
+  message          String
+  triggeredAt      DateTime      @default(now()) @map("triggered_at")
+  acknowledgedById String?       @map("acknowledged_by") @db.Uuid
+  acknowledgedAt   DateTime?     @map("acknowledged_at")
+  resolvedAt       DateTime?     @map("resolved_at")
+  acknowledgedBy   InternalUser? @relation("AcknowledgedBy", fields: [acknowledgedById], references: [id])
+  alertRule        AlertRule     @relation(fields: [alertRuleId], references: [id])
+  company          Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  device           Device?       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([status, severity])
+  @@index([companyId])
+  @@index([deviceId])
+  @@map("alerts")
+}
+
+model AuditLog {
+  id          String        @id @default(uuid()) @db.Uuid
+  actorUserId String?       @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String        @map("entity_type")
+  entityId    String?       @map("entity_id") @db.Uuid
+  companyId   String?       @map("company_id") @db.Uuid
+  deviceId    String?       @map("device_id") @db.Uuid
+  oldValue    Json?         @map("old_value")
+  newValue    Json?         @map("new_value")
+  ipAddress   String?       @map("ip_address")
+  source      AuditSource   @default(API)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  actor       InternalUser? @relation(fields: [actorUserId], references: [id])
+  company     Company?      @relation(fields: [companyId], references: [id])
+  device      Device?       @relation(fields: [deviceId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CompanyAccessLevel {
+  VIEW
+  MANAGE
+}
+
+enum CompanyStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum DocumentType {
+  CPF
+  CNPJ
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum MarketplaceAccountStatus {
+  ACTIVE
+  PENDING
+  DISCONNECTED
+  BLOCKED
+  ERROR
+  INACTIVE
+}
+
+enum ConnectionType {
+  WIFI
+  MOBILE
+  UNKNOWN
+}
+
+enum AlertSeverity {
+  CRITICAL
+  WARNING
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum AuditSource {
+  WEB
+  API
+  AGENT
+  SYSTEM
+}

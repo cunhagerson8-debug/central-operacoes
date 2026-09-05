@@ -1,0 +1,56 @@
+name: central-operacoes
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: central
+      POSTGRES_PASSWORD: central_dev_password
+      POSTGRES_DB: central_operacoes
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central -d central_operacoes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../../apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://central:central_dev_password@postgres:5432/central_operacoes?schema=public
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    env_file:
+      - ../../apps/api/.env
+    ports:
+      - "3000:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+
+# Próximos serviços (não adicionados ainda para não antecipar complexidade):
+#   - broker MQTT (quando o agente Android entrar em cena)
+#   - workers BullMQ dedicados (quando integrações de marketplace entrarem)

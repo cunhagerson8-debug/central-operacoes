@@ -1,0 +1,23 @@
+{
+  "name": "central-operacoes",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d postgres redis",
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down",
+    "prisma:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "prisma:generate": "npm run prisma:generate --workspace=apps/api",
+    "prisma:studio": "npm run prisma:studio --workspace=apps/api",
+    "seed": "npm run seed --workspace=apps/api",
+    "test:api": "npm run test --workspace=apps/api"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
