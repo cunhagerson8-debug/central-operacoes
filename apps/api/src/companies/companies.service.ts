@@ -7,19 +7,47 @@ import { UpdateCompanyDto } from './dto/update-company.dto';
 export class CompaniesService {
   constructor(private readonly prisma: PrismaService) {}
 
- async findAll(page = 1, limit = 50) {
+ async findAll(page = 1, limit = 50, search = '') {
   const safePage = page > 0 ? page : 1;
   const safeLimit = limit > 0 && limit <= 100 ? limit : 50;
+  const term = search.trim();
+
+  const where = term
+    ? {
+        OR: [
+          {
+            name: {
+              contains: term,
+              mode: 'insensitive' as const,
+            },
+          },
+          {
+            legalName: {
+              contains: term,
+              mode: 'insensitive' as const,
+            },
+          },
+          {
+            document: {
+              contains: term,
+            },
+          },
+        ],
+      }
+    : {};
 
   const [companies, total] = await this.prisma.$transaction([
     this.prisma.company.findMany({
+      where,
       orderBy: {
         createdAt: 'desc',
       },
       skip: (safePage - 1) * safeLimit,
       take: safeLimit,
     }),
-    this.prisma.company.count(),
+    this.prisma.company.count({
+      where,
+    }),
   ]);
 
   return {
