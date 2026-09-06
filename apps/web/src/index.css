@@ -1205,3 +1205,58 @@ form button:disabled {
 .companies-pagination button:not(:disabled):hover {
   background: #f8fafc;
 }
+
+.companies-search {
+  margin-top: 18px;
+  padding: 16px 18px;
+}
+
+.companies-search form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.companies-search input {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  outline: none;
+}
+
+.companies-search input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.companies-search button {
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.companies-search button:hover {
+  background: #1d4ed8;
+}
+
+@media (max-width: 700px) {
+  .companies-search form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .companies-search button {
+    width: 100%;
+  }
+}

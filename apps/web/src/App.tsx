@@ -114,8 +114,9 @@ function App() {
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companiesPage, setCompaniesPage] = useState(1);
-const [companiesTotal, setCompaniesTotal] = useState(0);
-const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
+  const [companiesTotal, setCompaniesTotal] = useState(0);
+  const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
+  const [companySearch, setCompanySearch] = useState('');
   const [companiesLoading, setCompaniesLoading] = useState(false);
   const [companiesError, setCompaniesError] = useState('');
   const [showNewCompany, setShowNewCompany] = useState(false);
@@ -145,6 +146,10 @@ const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
   const [driverNotes, setDriverNotes] = useState('');
   const [driverCompanyIds, setDriverCompanyIds] = useState<string[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [devicesPage, setDevicesPage] = useState(1);
+  const [devicesTotal, setDevicesTotal] = useState(0);
+  const [devicesTotalPages, setDevicesTotalPages] = useState(1);
+  const [deviceSearch, setDeviceSearch] = useState('');
   const [devicesLoading, setDevicesLoading] = useState(false);
   const [devicesError, setDevicesError] = useState('');
   const [deviceFormLoading, setDeviceFormLoading] = useState(false);
@@ -159,6 +164,15 @@ const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
   const [deviceConnectionType, setDeviceConnectionType] = useState<'WIFI' | 'MOBILE' | 'UNKNOWN'>('UNKNOWN');
   const [deviceStatus, setDeviceStatus] = useState<'ACTIVE' | 'INACTIVE' | 'BLOCKED'>('ACTIVE');
   const [deviceNotes, setDeviceNotes] = useState('');
+  const [showUsers, setShowUsers] = useState(false);
+  const [showHolders, setShowHolders] = useState(false);
+  const [showPermissions, setShowPermissions] = useState(false);
+const [roles, setRoles] = useState<any[]>([]);
+const [rolesLoading, setRolesLoading] = useState(false);
+const [rolesError, setRolesError] = useState('');
+const [users, setUsers] = useState<any[]>([]);
+const [usersLoading, setUsersLoading] = useState(false);
+const [usersError, setUsersError] = useState('');
   const [smsMessages, setSmsMessages] = useState<SmsMessage[]>([]);
   const [smsLoading, setSmsLoading] = useState(false);
   const [smsError, setSmsError] = useState('');
@@ -336,7 +350,9 @@ const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
     setCompaniesError('');
 
     try {
-      const response = await fetch(`${API_URL}/companies?page=${companiesPage}&limit=50`, {
+     const response = await fetch(
+  `${API_URL}/companies?page=${companiesPage}&limit=50&search=${encodeURIComponent(companySearch)}`,
+  {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -441,6 +457,82 @@ const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
     }
   }
 
+  async function loadUsers() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setUsersLoading(true);
+  setUsersError('');
+
+  try {
+    const response = await fetch(`${API_URL}/users`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível carregar os usuários.',
+      );
+    }
+
+    setUsers(Array.isArray(data) ? data : []);
+  } catch (err) {
+    setUsersError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao carregar usuários.',
+    );
+  } finally {
+    setUsersLoading(false);
+  }
+}
+
+async function loadRoles() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setRolesLoading(true);
+  setRolesError('');
+
+  try {
+    const response = await fetch(`${API_URL}/roles`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível carregar as permissões.',
+      );
+    }
+
+    setRoles(Array.isArray(data) ? data : []);
+  } catch (err) {
+    setRolesError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao carregar permissões.',
+    );
+  } finally {
+    setRolesLoading(false);
+  }
+}
+
   async function loadDevices() {
     const token = localStorage.getItem('accessToken');
 
@@ -453,16 +545,21 @@ const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
     setDevicesError('');
 
     try {
-      const response = await fetch(`${API_URL}/devices`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
+      const response = await fetch(
+  `${API_URL}/devices?page=${devicesPage}&limit=50&search=${encodeURIComponent(deviceSearch)}`,
+  {
+    headers: { Authorization: `Bearer ${token}` },
+  },
+);
+const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.message || 'Não foi possível carregar os aparelhos.');
       }
 
-      setDevices(Array.isArray(data) ? data : []);
+      setDevices(Array.isArray(data.data) ? data.data : []);
+setDevicesTotal(data.total ?? 0);
+setDevicesTotalPages(data.totalPages ?? 1);
     } catch (err) {
       setDevicesError(err instanceof Error ? err.message : 'Erro ao carregar aparelhos.');
     } finally {
@@ -745,7 +842,19 @@ const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
       loadCompanies();
       loadDrivers();
     }
-  }, [showDevices]);
+  }, [showDevices, devicesPage]);
+
+  useEffect(() => {
+  if (showUsers) {
+    loadUsers();
+  }
+}, [showUsers]);
+
+useEffect(() => {
+  if (showPermissions) {
+    loadRoles();
+  }
+}, [showPermissions]);
 
   useEffect(() => {
     if (showSms) {
@@ -1223,6 +1332,27 @@ useEffect(() => {
               </button>
             </div>
           </section>
+          
+          <section className="welcome-card companies-search">
+  <form
+    onSubmit={(event) => {
+      event.preventDefault();
+      if (devicesPage !== 1) {
+  setDevicesPage(1);
+} else {
+  loadDevices();
+}
+    }}
+  >
+    <input
+      type="text"
+      value={deviceSearch}
+      onChange={(event) => setDeviceSearch(event.target.value)}
+      placeholder="Buscar por número, IMEI, modelo, fabricante ou empresa"
+    />
+    <button type="submit">Buscar</button>
+  </form>
+</section>
 
           <section className="device-metrics">
             <div><strong>{devices.length}</strong><span>Total de aparelhos</span></div>
@@ -1332,6 +1462,37 @@ useEffect(() => {
                   </div>
                 );
               })}
+              <section className="companies-pagination">
+  <span>
+    Total: {devicesTotal} aparelhos
+  </span>
+
+  <div>
+    <button
+      type="button"
+      disabled={devicesPage <= 1}
+      onClick={() => setDevicesPage((page) => Math.max(1, page - 1))}
+    >
+      Anterior
+    </button>
+
+    <span>
+      Página {devicesPage} de {devicesTotalPages}
+    </span>
+
+    <button
+      type="button"
+      disabled={devicesPage >= devicesTotalPages}
+      onClick={() =>
+        setDevicesPage((page) =>
+          Math.min(devicesTotalPages, page + 1),
+        )
+      }
+    >
+      Próxima
+    </button>
+  </div>
+</section>
             </section>
           )}
         </main>
@@ -1339,6 +1500,231 @@ useEffect(() => {
     );
   }
 
+  // TELA DE USUÁRIOS
+if (showUsers) {
+  return (
+    <div className="dashboard-page">
+      <header className="dashboard-header">
+        <div>
+          <div className="dashboard-logo">MIL</div>
+          <div>
+            <h1>Central de Operações</h1>
+            <span>Gestão de Usuários</span>
+          </div>
+        </div>
+
+        <button
+          className="logout-button"
+          onClick={() => setShowUsers(false)}
+        >
+          ← Início
+        </button>
+      </header>
+
+      <main className="dashboard-content">
+        <section className="welcome-card">
+          <div className="companies-title">
+            <div>
+              <span className="badge">ACESSOS</span>
+              <h2>Usuários</h2>
+              <p>Consulte os usuários e perfis de acesso da plataforma.</p>
+            </div>
+          </div>
+        </section>
+
+        {usersLoading && (
+          <section className="welcome-card">
+            <p>Carregando usuários...</p>
+          </section>
+        )}
+
+        {usersError && (
+          <section className="welcome-card">
+            <div className="error-message">
+              {usersError}
+            </div>
+          </section>
+        )}
+
+        {!usersLoading && !usersError && users.length === 0 && (
+          <section className="welcome-card">
+            <p>Nenhum usuário cadastrado.</p>
+          </section>
+        )}
+
+        {!usersLoading && !usersError && users.length > 0 && (
+          <section className="companies-list">
+            {users.map((user) => (
+              <div className="company-row" key={user.id}>
+                <div>
+                  <strong>{user.name || 'Usuário sem nome'}</strong>
+                  <span>{user.email}</span>
+                  <span>
+                    Perfil:{' '}
+                    {user.userRoles
+                      ?.map((item: any) => item.role?.name)
+                      .filter(Boolean)
+                      .join(', ') || 'Sem perfil'}
+                  </span>
+                  <span>
+                    Último acesso:{' '}
+                    {user.lastLoginAt
+                      ? new Date(user.lastLoginAt).toLocaleString('pt-BR')
+                      : 'Nunca acessou'}
+                  </span>
+                </div>
+
+                <span className="status-badge">
+                  {user.status || 'SEM STATUS'}
+                </span>
+              </div>
+            ))}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// TELA DE PERMISSÕES
+if (showPermissions) {
+  return (
+    <div className="dashboard-page">
+      <header className="dashboard-header">
+        <div>
+          <div className="dashboard-logo">MIL</div>
+          <div>
+            <h1>Central de Operações</h1>
+            <span>Gestão de Permissões</span>
+          </div>
+        </div>
+
+        <button
+          className="logout-button"
+          onClick={() => setShowPermissions(false)}
+        >
+          ← Início
+        </button>
+      </header>
+
+      <main className="dashboard-content">
+        <section className="welcome-card">
+          <div className="companies-title">
+            <div>
+              <span className="badge">ACESSOS</span>
+              <h2>Permissões</h2>
+              <p>Consulte os perfis e permissões de acesso da plataforma.</p>
+            </div>
+          </div>
+        </section>
+
+        {rolesLoading && (
+          <section className="welcome-card">
+            <p>Carregando permissões...</p>
+          </section>
+        )}
+
+        {rolesError && (
+          <section className="welcome-card">
+            <div className="error-message">
+              {rolesError}
+            </div>
+          </section>
+        )}
+
+        {!rolesLoading && !rolesError && roles.length === 0 && (
+          <section className="welcome-card">
+            <p>Nenhum perfil de acesso cadastrado.</p>
+          </section>
+        )}
+
+        {!rolesLoading && !rolesError && roles.length > 0 && (
+          <section className="companies-list">
+            {roles.map((role) => (
+              <div className="company-row" key={role.id}>
+                <div>
+                  <strong>{role.name}</strong>
+                  <span>
+                    {role.description || 'Sem descrição'}
+                  </span>
+                  <span>
+                    Permissões:{' '}
+                    {role.rolePermissions
+                      ?.map((item: any) => item.permission?.code)
+                      .filter(Boolean)
+                      .join(', ') || 'Nenhuma permissão'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+// TELA DE TITULARES
+if (showHolders) {
+  return (
+    <div className="dashboard-page">
+      <header className="dashboard-header">
+        <div>
+          <div className="dashboard-logo">MIL</div>
+          <div>
+            <h1>Central de Operações</h1>
+            <span>Gestão de Titulares</span>
+          </div>
+        </div>
+
+        <button
+          className="logout-button"
+          onClick={() => setShowHolders(false)}
+        >
+          ← Início
+        </button>
+      </header>
+
+      <main className="dashboard-content">
+        <section className="welcome-card">
+          <div className="companies-title">
+            <div>
+              <span className="badge">CADASTROS</span>
+              <h2>Titulares</h2>
+              <p>Consulte os titulares cadastrados na plataforma.</p>
+            </div>
+          </div>
+        </section>
+
+        {holdersLoading && (
+          <section className="welcome-card">
+            <p>Carregando titulares...</p>
+          </section>
+        )}
+
+        {!holdersLoading && holders.length === 0 && (
+          <section className="welcome-card">
+            <p>Nenhum titular cadastrado.</p>
+          </section>
+        )}
+
+        {!holdersLoading && holders.length > 0 && (
+          <section className="companies-list">
+            {holders.map((holder) => (
+              <div className="company-row" key={holder.id}>
+                <div>
+                  <strong>{holder.fullName || 'Titular sem nome'}</strong>
+                  <span>{holder.cpf || 'CPF não informado'}</span>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+  
   // TELA DE MOTORISTAS
   if (showDrivers) {
     return (
@@ -1548,6 +1934,31 @@ useEffect(() => {
 </button>
 </div>
 </div>
+</section>
+
+<section className="welcome-card companies-search">
+  <form
+    onSubmit={(event) => {
+      event.preventDefault();
+
+      if (companiesPage !== 1) {
+        setCompaniesPage(1);
+      } else {
+        loadCompanies();
+      }
+    }}
+  >
+    <input
+      type="search"
+      placeholder="Buscar por nome, razão social ou CNPJ"
+      value={companySearch}
+      onChange={(event) => setCompanySearch(event.target.value)}
+    />
+
+    <button type="submit">
+      Buscar
+    </button>
+  </form>
 </section>
 
           {companiesLoading && (
@@ -2109,17 +2520,26 @@ return (
           <span>Monitorar status das contas</span>
         </button>
 
-        <button className="module-card">
+        <button
+  className="module-card"
+  onClick={() => setShowUsers(true)}
+>
           <strong>Usuários</strong>
           <span>Gerenciar usuários e acessos</span>
         </button>
 
-        <button className="module-card">
+        <button
+  className="module-card"
+  onClick={() => setShowHolders(true)}
+>
           <strong>Titulares</strong>
           <span>Consultar titulares cadastrados</span>
         </button>
 
-        <button className="module-card">
+        <button
+  className="module-card"
+  onClick={() => setShowPermissions(true)}
+>
           <strong>Permissões</strong>
           <span>Controle de acesso do sistema</span>
         </button>

@@ -24,10 +24,12 @@ export class CompaniesController {
 async findAll(
   @Query('page') page = '1',
   @Query('limit') limit = '50',
+  @Query('search') search = '',
 ) {
   return this.companiesService.findAll(
     Number(page),
     Number(limit),
+    search,
   );
 }
 

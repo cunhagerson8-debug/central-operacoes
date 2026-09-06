@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post,Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
 import { Permissions } from '../auth/permissions.decorator';
@@ -20,11 +20,19 @@ export class DevicesController {
     return this.devicesService.create(dto);
   }
 
-  @Get()
-  @Permissions('device.view')
-  findAll() {
-    return this.devicesService.findAll();
-  }
+ @Get()
+@Permissions('device.view')
+findAll(
+  @Query('page') page = '1',
+  @Query('limit') limit = '50',
+  @Query('search') search = '',
+) {
+  return this.devicesService.findAll(
+    Number(page),
+    Number(limit),
+    search,
+  );
+}
 
   @Get(':id')
   @Permissions('device.view')

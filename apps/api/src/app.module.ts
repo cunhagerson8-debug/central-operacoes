@@ -13,6 +13,7 @@ import { DriversModule } from './drivers/drivers.module';
 import { DevicesModule } from './devices/devices.module';
 import { SmsModule } from './sms/sms.module';
 import { MarketplacesModule } from './marketplaces/marketplaces.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { MarketplacesModule } from './marketplaces/marketplaces.module';
     DevicesModule,
     SmsModule,
     MarketplacesModule,
+    RolesModule,
     // Próximos módulos (Bloco 2 em diante): AuthModule, UsersModule,
     // RolesModule, PermissionsModule, CompaniesModule, HoldersModule,
     // DevicesModule, AlertsModule, AuditModule.

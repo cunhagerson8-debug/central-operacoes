@@ -55,14 +55,86 @@ function presentDevice(device: DeviceWithRelations) {
 export class DevicesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
-    const devices = await this.prisma.device.findMany({
+  async findAll(page = 1, limit = 50, search = '') {
+  const safePage = page > 0 ? page : 1;
+  const safeLimit = limit > 0 && limit <= 100 ? limit : 50;
+  const term = search.trim();
+
+  const where = term
+    ? {
+        OR: [
+          {
+            phoneNumber: {
+              contains: term,
+            },
+          },
+          {
+            imei: {
+              contains: term,
+            },
+          },
+          {
+            model: {
+              contains: term,
+              mode: 'insensitive' as const,
+            },
+          },
+          {
+            manufacturer: {
+              contains: term,
+              mode: 'insensitive' as const,
+            },
+          },
+          {
+            company: {
+              is: {
+                OR: [
+                  {
+                    name: {
+                      contains: term,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                  {
+                    legalName: {
+                      contains: term,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                  {
+                    document: {
+                      contains: term,
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      }
+    : {};
+
+  const [devices, total] = await this.prisma.$transaction([
+    this.prisma.device.findMany({
+      where,
       include: deviceInclude,
       orderBy: { createdAt: 'desc' },
-    });
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+    }),
+    this.prisma.device.count({
+      where,
+    }),
+  ]);
 
-    return devices.map((device) => presentDevice(device));
-  }
+  return {
+    data: devices.map((device) => presentDevice(device)),
+    total,
+    page: safePage,
+    limit: safeLimit,
+    totalPages: Math.ceil(total / safeLimit),
+  };
+}
 
   async findOne(id: string) {
     const device = await this.prisma.device.findUnique({
