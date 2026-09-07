@@ -1768,7 +1768,10 @@ if (showUsers) {
                   {user.status || 'SEM STATUS'}
                 </span>
 
-                {user.status === 'ACTIVE' && (
+                {user.status === 'ACTIVE' &&
+  !user.userRoles?.some(
+    (item: any) => item.role?.name === 'SUPER_ADMIN'
+  ) && (
   <button
     type="button"
     onClick={() => handleDeactivateUser(user.id, user.name)}
