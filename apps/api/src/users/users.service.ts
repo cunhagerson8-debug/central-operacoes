@@ -84,4 +84,43 @@ export class UsersService {
     },
   });
 }
+
+async deactivate(id: string) {
+  const user = await this.prisma.internalUser.findUnique({
+    where: { id },
+    include: {
+      userRoles: {
+        include: {
+          role: true,
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    throw new NotFoundException('Usuário não encontrado.');
+  }
+
+  const isSuperAdmin = user.userRoles.some(
+    (userRole) => userRole.role.name === 'SUPER_ADMIN',
+  );
+
+  if (isSuperAdmin) {
+    throw new ConflictException('O SUPER_ADMIN não pode ser desativado.');
+  }
+
+  return this.prisma.internalUser.update({
+    where: { id },
+    data: {
+      status: 'INACTIVE',
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      status: true,
+    },
+  });
+}
+
 }

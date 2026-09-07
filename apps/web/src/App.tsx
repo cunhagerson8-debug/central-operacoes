@@ -353,6 +353,41 @@ const [usersError, setUsersError] = useState('');
     setPassword('');
   }
 
+  async function handleDeactivateUser(userId: string, userName: string) {
+  const confirmed = window.confirm(
+    `Deseja realmente desativar o usuário "${userName}"?`
+  );
+
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('accessToken');
+
+  try {
+    const response = await fetch(`${API_URL}/users/${userId}/deactivate`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível desativar o usuário.'
+      );
+    }
+
+    await loadUsers();
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao desativar o usuário.'
+    );
+  }
+}
+
   async function loadCompanies() {
     const token = localStorage.getItem('accessToken');
 
@@ -1732,6 +1767,15 @@ if (showUsers) {
                 <span className="status-badge">
                   {user.status || 'SEM STATUS'}
                 </span>
+
+                {user.status === 'ACTIVE' && (
+  <button
+    type="button"
+    onClick={() => handleDeactivateUser(user.id, user.name)}
+  >
+    Desativar
+  </button>
+)}
               </div>
             ))}
           </section>

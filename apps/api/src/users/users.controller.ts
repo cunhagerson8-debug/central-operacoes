@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { Permissions } from '../auth/permissions.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -21,4 +21,11 @@ export class UsersController {
   async create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
+
+  @Patch(':id/deactivate')
+@Permissions('user.manage')
+async deactivate(@Param('id') id: string) {
+  return this.usersService.deactivate(id);
+}
+
 }
