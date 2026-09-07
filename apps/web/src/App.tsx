@@ -104,6 +104,12 @@ function App() {
   );
 
   const [showCompanies, setShowCompanies] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+const [newUserEmail, setNewUserEmail] = useState('');
+const [newUserPassword, setNewUserPassword] = useState('');
+const [newUserRole, setNewUserRole] = useState('GESTOR');
+const [newUserError, setNewUserError] = useState('');
   const [showDrivers, setShowDrivers] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
   const [showSms, setShowSms] = useState(false);
@@ -492,6 +498,57 @@ const [usersError, setUsersError] = useState('');
     );
   } finally {
     setUsersLoading(false);
+  }
+}
+
+async function createUser() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setNewUserError('');
+
+  try {
+    const response = await fetch(`${API_URL}/users`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: newUserName,
+        email: newUserEmail,
+        password: newUserPassword,
+        role: newUserRole,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        Array.isArray(data.message)
+          ? data.message.join(', ')
+          : data.message || 'Não foi possível cadastrar o usuário.',
+      );
+    }
+
+    setNewUserName('');
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserRole('GESTOR');
+    setShowCreateUser(false);
+
+    await loadUsers();
+  } catch (err) {
+    setNewUserError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao cadastrar usuário.',
+    );
   }
 }
 
@@ -1523,14 +1580,103 @@ if (showUsers) {
 
       <main className="dashboard-content">
         <section className="welcome-card">
-          <div className="companies-title">
-            <div>
-              <span className="badge">ACESSOS</span>
-              <h2>Usuários</h2>
-              <p>Consulte os usuários e perfis de acesso da plataforma.</p>
-            </div>
-          </div>
-        </section>
+  <div className="companies-title">
+    <div>
+      <span className="badge">ACESSOS</span>
+      <h2>Usuários</h2>
+      <p>Consulte os usuários e perfis de acesso da plataforma.</p>
+    </div>
+
+    <button
+      className="primary-button"
+      onClick={() => setShowCreateUser(true)}
+    >
+      + Novo Usuário
+    </button>
+  </div>
+</section>
+
+{showCreateUser && (
+  <section className="welcome-card">
+    <div className="companies-title">
+      <div>
+        <span className="badge">NOVO ACESSO</span>
+        <h2>Cadastrar Novo Usuário</h2>
+        <p>Crie o acesso do cliente à Central de Operações.</p>
+      </div>
+    </div>
+
+    {newUserError && (
+      <div className="error-message">
+        {newUserError}
+      </div>
+    )}
+
+    <div className="form-grid">
+      <label>
+        Nome
+        <input
+          type="text"
+          value={newUserName}
+          onChange={(e) => setNewUserName(e.target.value)}
+          placeholder="Nome do usuário"
+        />
+      </label>
+
+      <label>
+        E-mail
+        <input
+          type="email"
+          value={newUserEmail}
+          onChange={(e) => setNewUserEmail(e.target.value)}
+          placeholder="cliente@empresa.com.br"
+        />
+      </label>
+
+      <label>
+        Senha inicial
+        <input
+          type="password"
+          value={newUserPassword}
+          onChange={(e) => setNewUserPassword(e.target.value)}
+          placeholder="Mínimo 8 caracteres"
+        />
+      </label>
+
+      <label>
+        Perfil de acesso
+        <select
+          value={newUserRole}
+          onChange={(e) => setNewUserRole(e.target.value)}
+        >
+          <option value="GESTOR">Gestor / Administrador do Cliente</option>
+          <option value="OPERADOR">Operador</option>
+        </select>
+      </label>
+    </div>
+
+    <div className="form-actions">
+      <button
+        type="button"
+        className="primary-button"
+        onClick={createUser}
+      >
+        Cadastrar Usuário
+      </button>
+
+      <button
+        type="button"
+        className="logout-button"
+        onClick={() => {
+          setShowCreateUser(false);
+          setNewUserError('');
+        }}
+      >
+        Cancelar
+      </button>
+    </div>
+  </section>
+)}
 
         {usersLoading && (
           <section className="welcome-card">
