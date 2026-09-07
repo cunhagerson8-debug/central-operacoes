@@ -123,4 +123,27 @@ async deactivate(id: string) {
   });
 }
 
+async activate(id: string) {
+  const user = await this.prisma.internalUser.findUnique({
+    where: { id },
+  });
+
+  if (!user) {
+    throw new NotFoundException('Usuário não encontrado.');
+  }
+
+  return this.prisma.internalUser.update({
+    where: { id },
+    data: {
+      status: 'ACTIVE',
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      status: true,
+    },
+  });
+}
+
 }

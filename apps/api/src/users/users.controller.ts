@@ -28,4 +28,10 @@ async deactivate(@Param('id') id: string) {
   return this.usersService.deactivate(id);
 }
 
+@Patch(':id/activate')
+@Permissions('user.manage')
+async activate(@Param('id') id: string) {
+  return this.usersService.activate(id);
+}
+
 }

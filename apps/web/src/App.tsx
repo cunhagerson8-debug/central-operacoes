@@ -388,6 +388,41 @@ const [usersError, setUsersError] = useState('');
   }
 }
 
+async function handleActivateUser(userId: string, userName: string) {
+  const confirmed = window.confirm(
+    `Deseja realmente reativar o usuário "${userName}"?`
+  );
+
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('accessToken');
+
+  try {
+    const response = await fetch(`${API_URL}/users/${userId}/activate`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível reativar o usuário.'
+      );
+    }
+
+    await loadUsers();
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao reativar o usuário.'
+    );
+  }
+}
+
   async function loadCompanies() {
     const token = localStorage.getItem('accessToken');
 
@@ -1779,6 +1814,16 @@ if (showUsers) {
     Desativar
   </button>
 )}
+
+{user.status === 'INACTIVE' && (
+  <button
+    type="button"
+    onClick={() => handleActivateUser(user.id, user.name)}
+  >
+    Reativar
+  </button>
+)}
+
               </div>
             ))}
           </section>
