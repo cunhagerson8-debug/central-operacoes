@@ -103,6 +103,11 @@ function App() {
     !!localStorage.getItem('accessToken'),
   );
 
+  const [currentUser, setCurrentUser] = useState<any>(() => {
+  const savedUser = localStorage.getItem('currentUser');
+  return savedUser ? JSON.parse(savedUser) : null;
+});
+
   const [showCompanies, setShowCompanies] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
@@ -324,6 +329,8 @@ const [usersError, setUsersError] = useState('');
       }
 
       localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      setCurrentUser(data.user);
       setLoggedIn(true);
     } catch (err) {
       setError(
@@ -338,6 +345,8 @@ const [usersError, setUsersError] = useState('');
 
   function handleLogout() {
     localStorage.removeItem('accessToken');
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
     setLoggedIn(false);
     setShowCompanies(false);
     setEmail('');
@@ -2309,8 +2318,8 @@ return (
         </div>
 
         <div className="dashboard-user">
-          <strong>SUPER_ADMIN</strong>
-          <span>Administrador</span>
+          <strong>{currentUser?.role ?? 'USUÁRIO'}</strong>
+          <span>{currentUser?.name ?? 'Usuário'}</span>
         </div>
 
         <button

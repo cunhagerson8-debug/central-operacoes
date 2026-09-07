@@ -15,9 +15,16 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.prisma.internalUser.findUnique({
-      where: { email },
-    });
+   const user = await this.prisma.internalUser.findUnique({
+  where: { email },
+  include: {
+    userRoles: {
+      include: {
+        role: true,
+      },
+    },
+  },
+});
 
     if (!user) {
       throw new UnauthorizedException('E-mail ou senha inválidos');
@@ -48,6 +55,7 @@ export class AuthService {
         name: user.name,
         email: user.email,
         status: user.status,
+        role: user.userRoles[0]?.role.name ?? null,
       },
     };
   }
