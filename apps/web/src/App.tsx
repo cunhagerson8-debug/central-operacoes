@@ -938,10 +938,55 @@ setDevicesTotalPages(data.totalPages ?? 1);
         throw new Error(data.message || 'Não foi possível cadastrar a empresa.');
       }
 
-      setCompaniesSuccess('Empresa cadastrada com sucesso.');
-      await loadCompanies();
-      resetCompanyForm();
-      setShowNewCompany(false);
+      const newCompanyId = data.id;
+
+if (!newCompanyId) {
+  throw new Error('A empresa foi criada, mas o sistema não retornou o ID.');
+}
+
+const deviceResponse = await fetch(`${API_URL}/devices`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  },
+  body: JSON.stringify({
+    companyId: newCompanyId,
+    phoneNumber: devicePhoneNumber.trim(),
+    imei: deviceImei.trim() || undefined,
+    manufacturer: deviceManufacturer.trim() || undefined,
+    model: deviceModel.trim() || undefined,
+    androidVersion: deviceAndroidVersion.trim() || undefined,
+    simCarrier: deviceSimCarrier.trim() || undefined,
+    connectionType: deviceConnectionType,
+    status: deviceStatus,
+    notes: deviceNotes.trim() || undefined,
+  }),
+});
+
+const deviceData = await deviceResponse.json();
+
+if (!deviceResponse.ok) {
+  const deviceMessage = Array.isArray(deviceData.message)
+    ? deviceData.message.join(' ')
+    : deviceData.message;
+
+  throw new Error(
+    `A empresa foi cadastrada, mas houve erro ao cadastrar o celular: ${
+      deviceMessage || 'verifique os dados do aparelho.'
+    }`
+  );
+}
+
+setCompaniesSuccess('Empresa e celular cadastrados com sucesso.');
+
+await loadCompanies();
+await loadDevices();
+
+resetCompanyForm();
+resetDeviceForm();
+
+setShowNewCompany(false);
     } catch (err) {
       setCompanyFormError(
         err instanceof Error
@@ -1186,6 +1231,89 @@ useEffect(() => {
                 onChange={(event) => setCompanyNotes(event.target.value)}
                 rows={4}
               />
+
+<hr />
+
+<h3>Dados do Celular</h3>
+
+<label htmlFor="company-device-phone">Número do celular *</label>
+<input
+  id="company-device-phone"
+  type="tel"
+  value={devicePhoneNumber}
+  onChange={(event) => setDevicePhoneNumber(event.target.value)}
+  required
+/>
+
+<label htmlFor="company-device-imei">IMEI ou identificador</label>
+<input
+  id="company-device-imei"
+  type="text"
+  value={deviceImei}
+  onChange={(event) => setDeviceImei(event.target.value)}
+/>
+
+<label htmlFor="company-device-manufacturer">Fabricante</label>
+<input
+  id="company-device-manufacturer"
+  type="text"
+  value={deviceManufacturer}
+  onChange={(event) => setDeviceManufacturer(event.target.value)}
+/>
+
+<label htmlFor="company-device-model">Modelo</label>
+<input
+  id="company-device-model"
+  type="text"
+  value={deviceModel}
+  onChange={(event) => setDeviceModel(event.target.value)}
+/>
+
+<label htmlFor="company-device-android">Versão Android</label>
+<input
+  id="company-device-android"
+  type="text"
+  value={deviceAndroidVersion}
+  onChange={(event) => setDeviceAndroidVersion(event.target.value)}
+/>
+
+<label htmlFor="company-device-carrier">Operadora</label>
+<input
+  id="company-device-carrier"
+  type="text"
+  value={deviceSimCarrier}
+  onChange={(event) => setDeviceSimCarrier(event.target.value)}
+/>
+
+<label htmlFor="company-device-connection">Tipo de conexão</label>
+<select
+  id="company-device-connection"
+  value={deviceConnectionType}
+  onChange={(event) =>
+    setDeviceConnectionType(
+      event.target.value as 'UNKNOWN' | 'WIFI' | 'MOBILE'
+    )
+  }
+>
+  <option value="UNKNOWN">Desconhecida</option>
+  <option value="WIFI">Wi-Fi</option>
+  <option value="MOBILE">Móvel</option>
+</select>
+
+<label htmlFor="company-device-status">Status do aparelho</label>
+<select
+  id="company-device-status"
+  value={deviceStatus}
+  onChange={(event) =>
+    setDeviceStatus(
+      event.target.value as 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
+    )
+  }
+>
+  <option value="ACTIVE">Ativo</option>
+  <option value="INACTIVE">Inativo</option>
+  <option value="BLOCKED">Bloqueado</option>
+</select>
 
               {companyFormError && (
                 <div className="error-message">{companyFormError}</div>
