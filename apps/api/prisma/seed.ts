@@ -201,8 +201,11 @@ async function main() {
       permissions: [
         'dashboard.view', 'user.view', 'user.create', 'user.update',
         'role.view', 'company.view', 'company.create', 'company.update',
-        'holder.view', 'holder.create', 'holder.update', 'device.view',
-        'device.update', 'alert.view', 'alert.acknowledge', 'alert.resolve',
+        'holder.view', 'holder.create', 'holder.update',
+'driver.view',
+'device.view', 'device.update',
+'sms.view',
+'alert.view', 'alert.acknowledge', 'alert.resolve',
         'audit.view', 'report.view',
       ],
     },
