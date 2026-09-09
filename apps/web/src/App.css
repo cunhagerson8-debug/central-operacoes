@@ -182,9 +182,9 @@
     border-right-color: var(--border);
   }
 
-/* Melhora a leitura dos títulos dos campos dos formulários */
+}
+ /* Melhora a leitura dos títulos dos campos dos formulários */
 .welcome-card label {
   color: #172033;
-  font-weight: 600;
-}
+  font-weight: 700;
 }
