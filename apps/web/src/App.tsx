@@ -110,6 +110,9 @@ function App() {
 
   const [showCompanies, setShowCompanies] = useState(false);
 const [showPayments, setShowPayments] = useState(false);
+const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<any[]>([]);
+const [paymentBeneficiariesLoading, setPaymentBeneficiariesLoading] = useState(false);
+const [paymentBeneficiariesError, setPaymentBeneficiariesError] = useState('');
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 const [newUserEmail, setNewUserEmail] = useState('');
@@ -483,6 +486,49 @@ async function handleActivateUser(userId: string, userName: string) {
     );
   }
 }
+
+async function loadPaymentBeneficiaries() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setPaymentBeneficiariesLoading(true);
+  setPaymentBeneficiariesError('');
+
+  try {
+    const response = await fetch(
+      `${API_URL}/payments/beneficiaries`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível carregar os beneficiários.',
+      );
+    }
+
+    setPaymentBeneficiaries(data);
+  } catch (err) {
+    setPaymentBeneficiariesError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao carregar os beneficiários.',
+    );
+  } finally {
+    setPaymentBeneficiariesLoading(false);
+  }
+}
+
+
 
   async function loadCompanies() {
     const token = localStorage.getItem('accessToken');
@@ -1083,6 +1129,12 @@ setShowNewCompany(false);
       loadCompanies();
     }
   }, [showCompanies, companiesPage]);
+
+  useEffect(() => {
+  if (showPayments) {
+    loadPaymentBeneficiaries();
+  }
+}, [showPayments]);
 
   useEffect(() => {
     if (showNewCompany) {
@@ -2441,6 +2493,35 @@ if (showPayments) {
           <p>
             Gerencie beneficiários, pagamentos mensais e vencimentos.
           </p>
+
+{paymentBeneficiariesLoading && (
+  <p>Carregando beneficiários...</p>
+)}
+
+{paymentBeneficiariesError && (
+  <div className="error-message">
+    {paymentBeneficiariesError}
+  </div>
+)}
+
+{!paymentBeneficiariesLoading &&
+  !paymentBeneficiariesError &&
+  paymentBeneficiaries.length === 0 && (
+    <p>Nenhum beneficiário cadastrado.</p>
+  )}
+
+{paymentBeneficiaries.length > 0 && (
+  <div>
+    <h3>Beneficiários cadastrados</h3>
+
+    {paymentBeneficiaries.map((beneficiary) => (
+      <div key={beneficiary.id}>
+        <strong>{beneficiary.name}</strong>
+      </div>
+    ))}
+  </div>
+)}
+
         </section>
       </main>
     </div>
