@@ -113,7 +113,16 @@ const [showPayments, setShowPayments] = useState(false);
 const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<any[]>([]);
 const [paymentBeneficiariesLoading, setPaymentBeneficiariesLoading] = useState(false);
 const [paymentBeneficiariesError, setPaymentBeneficiariesError] = useState('');
-  const [showCreateUser, setShowCreateUser] = useState(false);
+ const [showNewPaymentBeneficiary, setShowNewPaymentBeneficiary] = useState(false);
+const [newPaymentBeneficiaryName, setNewPaymentBeneficiaryName] = useState('');
+const [newPaymentBeneficiaryDocument, setNewPaymentBeneficiaryDocument] = useState('');
+const [newPaymentBeneficiaryPixKey, setNewPaymentBeneficiaryPixKey] = useState('');
+const [newPaymentBeneficiaryBank, setNewPaymentBeneficiaryBank] = useState('');
+const [newPaymentBeneficiaryAgency, setNewPaymentBeneficiaryAgency] = useState('');
+const [newPaymentBeneficiaryAccount, setNewPaymentBeneficiaryAccount] = useState('');
+const [newPaymentBeneficiaryLoading, setNewPaymentBeneficiaryLoading] = useState(false);
+const [newPaymentBeneficiaryError, setNewPaymentBeneficiaryError] = useState('');
+const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 const [newUserEmail, setNewUserEmail] = useState('');
 const [newUserPassword, setNewUserPassword] = useState('');
@@ -488,6 +497,8 @@ async function handleActivateUser(userId: string, userName: string) {
 }
 
 async function loadPaymentBeneficiaries() {
+
+
   const token = localStorage.getItem('accessToken');
 
   if (!token) {
@@ -525,6 +536,68 @@ async function loadPaymentBeneficiaries() {
     );
   } finally {
     setPaymentBeneficiariesLoading(false);
+  }
+}
+
+async function createPaymentBeneficiary() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  if (!newPaymentBeneficiaryName.trim()) {
+    setNewPaymentBeneficiaryError('Informe o nome do beneficiário.');
+    return;
+  }
+
+  setNewPaymentBeneficiaryLoading(true);
+  setNewPaymentBeneficiaryError('');
+
+  try {
+    const response = await fetch(
+      `${API_URL}/payments/beneficiaries`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newPaymentBeneficiaryName.trim(),
+          document: newPaymentBeneficiaryDocument.trim() || undefined,
+          pixKey: newPaymentBeneficiaryPixKey.trim() || undefined,
+          bankName: newPaymentBeneficiaryBank.trim() || undefined,
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível cadastrar o beneficiário.',
+      );
+    }
+
+    setNewPaymentBeneficiaryName('');
+    setNewPaymentBeneficiaryDocument('');
+    setNewPaymentBeneficiaryPixKey('');
+    setNewPaymentBeneficiaryBank('');
+    setNewPaymentBeneficiaryAgency('');
+    setNewPaymentBeneficiaryAccount('');
+    setShowNewPaymentBeneficiary(false);
+
+    await loadPaymentBeneficiaries();
+  } catch (err) {
+    setNewPaymentBeneficiaryError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao cadastrar o beneficiário.',
+    );
+  } finally {
+    setNewPaymentBeneficiaryLoading(false);
   }
 }
 
@@ -2493,6 +2566,119 @@ if (showPayments) {
           <p>
             Gerencie beneficiários, pagamentos mensais e vencimentos.
           </p>
+
+<button
+  className="new-company-button"
+  onClick={() => {
+    setNewPaymentBeneficiaryError('');
+    setShowNewPaymentBeneficiary(true);
+  }}
+>
+  + Novo Beneficiário
+</button>
+
+{showNewPaymentBeneficiary && (
+  <div className="welcome-card">
+    <h3>Novo Beneficiário</h3>
+
+    {newPaymentBeneficiaryError && (
+      <div className="error-message">
+        {newPaymentBeneficiaryError}
+      </div>
+    )}
+
+    <div className="form-grid">
+      <label>
+        Nome
+        <input
+          value={newPaymentBeneficiaryName}
+          onChange={(event) =>
+            setNewPaymentBeneficiaryName(event.target.value)
+          }
+          placeholder="Nome do beneficiário"
+        />
+      </label>
+
+      <label>
+        CPF/CNPJ
+        <input
+          value={newPaymentBeneficiaryDocument}
+          onChange={(event) =>
+            setNewPaymentBeneficiaryDocument(event.target.value)
+          }
+          placeholder="CPF ou CNPJ"
+        />
+      </label>
+
+      <label>
+        Chave PIX
+        <input
+          value={newPaymentBeneficiaryPixKey}
+          onChange={(event) =>
+            setNewPaymentBeneficiaryPixKey(event.target.value)
+          }
+          placeholder="Chave PIX"
+        />
+      </label>
+
+      <label>
+        Banco
+        <input
+          value={newPaymentBeneficiaryBank}
+          onChange={(event) =>
+            setNewPaymentBeneficiaryBank(event.target.value)
+          }
+          placeholder="Nome do banco"
+        />
+      </label>
+
+      <label>
+        Agência
+        <input
+          value={newPaymentBeneficiaryAgency}
+          onChange={(event) =>
+            setNewPaymentBeneficiaryAgency(event.target.value)
+          }
+          placeholder="Agência"
+        />
+      </label>
+
+      <label>
+        Conta
+        <input
+          value={newPaymentBeneficiaryAccount}
+          onChange={(event) =>
+            setNewPaymentBeneficiaryAccount(event.target.value)
+          }
+          placeholder="Conta"
+        />
+      </label>
+    </div>
+
+    <div className="form-actions">
+      <button
+        className="new-company-button"
+        onClick={createPaymentBeneficiary}
+        disabled={newPaymentBeneficiaryLoading}
+      >
+        {newPaymentBeneficiaryLoading
+          ? 'Salvando...'
+          : 'Salvar Beneficiário'}
+      </button>
+
+      <button
+        type="button"
+        className="logout-button"
+        onClick={() => {
+          setShowNewPaymentBeneficiary(false);
+          setNewPaymentBeneficiaryError('');
+        }}
+      >
+        Cancelar
+      </button>
+    </div>
+  </div>
+)}
 
 {paymentBeneficiariesLoading && (
   <p>Carregando beneficiários...</p>
