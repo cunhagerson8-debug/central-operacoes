@@ -10,6 +10,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
+import { Permissions } from '../auth/permissions.decorator';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
@@ -17,21 +18,25 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('beneficiaries')
+  @Permissions('payment.create')
   createBeneficiary(@Body() dto: CreatePaymentBeneficiaryDto) {
     return this.paymentsService.createBeneficiary(dto);
   }
 
   @Get('beneficiaries')
+  @Permissions('payment.view')
   findAllBeneficiaries() {
     return this.paymentsService.findAllBeneficiaries();
   }
 
   @Post()
+  @Permissions('payment.create')
 createPayment(@Body() dto: CreatePaymentDto) {
   return this.paymentsService.createPayment(dto);
 }
 
 @Get()
+@Permissions('payment.view')
 findAllPayments() {
   return this.paymentsService.findAllPayments();
 }
