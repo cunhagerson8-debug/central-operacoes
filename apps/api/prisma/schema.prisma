@@ -116,7 +116,7 @@ model Company {
   legalName           String?                     @map("legal_name")
   document            String                      @unique
   documentType        DocumentType                @map("document_type")
-  holderId            String                      @map("holder_id") @db.Uuid
+ holderId String? @map("holder_id") @db.Uuid
   phone               String?
   email               String?
   zipCode      String? @map("zip_code")
@@ -134,7 +134,7 @@ state        String?
   deactivatedAt       DateTime?                   @map("deactivated_at")
   alerts              Alert[]
   auditLogs           AuditLog[]
-  holder              Holder                      @relation(fields: [holderId], references: [id])
+  holder              Holder?                     @relation(fields: [holderId], references: [id])
   internalOwner       InternalUser?               @relation("InternalOwner", fields: [internalOwnerId], references: [id])
   changeHistory       CompanyChangeHistory[]
   devices             Device[]

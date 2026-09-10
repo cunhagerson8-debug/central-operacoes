@@ -155,7 +155,67 @@ const [newUserError, setNewUserError] = useState('');
   const [driverEmail, setDriverEmail] = useState('');
   const [driverStatus, setDriverStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
   const [driverNotes, setDriverNotes] = useState('');
+  function updateCompanyDevice(
+  index: number,
+  field: keyof CompanyDeviceForm,
+  value: string,
+) {
+  setCompanyDevices((current) =>
+    current.map((device, deviceIndex) =>
+      deviceIndex === index ? { ...device, [field]: value } : device,
+    ),
+  );
+}
+
+function addCompanyDevice() {
+  setCompanyDevices((current) => [
+    ...current,
+    {
+      phoneNumber: '',
+      imei: '',
+      manufacturer: '',
+      model: '',
+      androidVersion: '',
+      simCarrier: '',
+      connectionType: 'UNKNOWN',
+      status: 'ACTIVE',
+      notes: '',
+    },
+  ]);
+}
+
+function removeCompanyDevice(index: number) {
+  setCompanyDevices((current) =>
+    current.length === 1
+      ? current
+      : current.filter((_, deviceIndex) => deviceIndex !== index),
+  );
+}
   const [driverCompanyIds, setDriverCompanyIds] = useState<string[]>([]);
+  type CompanyDeviceForm = {
+  phoneNumber: string;
+  imei: string;
+  manufacturer: string;
+  model: string;
+  androidVersion: string;
+  simCarrier: string;
+  connectionType: 'UNKNOWN' | 'WIFI' | 'MOBILE';
+status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+  notes: string;
+};
+const [companyDevices, setCompanyDevices] = useState<CompanyDeviceForm[]>([
+  {
+    phoneNumber: '',
+    imei: '',
+    manufacturer: '',
+    model: '',
+    androidVersion: '',
+    simCarrier: '',
+    connectionType: 'UNKNOWN',
+    status: 'ACTIVE',
+    notes: '',
+  },
+]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [devicesPage, setDevicesPage] = useState(1);
   const [devicesTotal, setDevicesTotal] = useState(0);
@@ -880,12 +940,23 @@ setDevicesTotalPages(data.totalPages ?? 1);
     event.preventDefault();
     setCompanyFormError('');
 
-    if (!companyName.trim() || !companyDocument.trim() || !companyHolderId) {
-      setCompanyFormError(
-        'Preencha o nome, o documento e selecione um titular.',
-      );
-      return;
-    }
+    if (!companyName.trim() || !companyDocument.trim()) {
+  setCompanyFormError(
+    'Preencha o nome e o documento da empresa.',
+  );
+  return;
+}
+
+const hasValidDevice = companyDevices.some(
+  (device) => device.phoneNumber.trim(),
+);
+
+if (!hasValidDevice) {
+  setCompanyFormError(
+    'Cadastre pelo menos um celular com número.',
+  );
+  return;
+}
 
     const token = localStorage.getItem('accessToken');
 
@@ -944,41 +1015,49 @@ if (!newCompanyId) {
   throw new Error('A empresa foi criada, mas o sistema não retornou o ID.');
 }
 
-const deviceResponse = await fetch(`${API_URL}/devices`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
-  },
-  body: JSON.stringify({
-    companyId: newCompanyId,
-    phoneNumber: devicePhoneNumber.trim(),
-    imei: deviceImei.trim() || undefined,
-    manufacturer: deviceManufacturer.trim() || undefined,
-    model: deviceModel.trim() || undefined,
-    androidVersion: deviceAndroidVersion.trim() || undefined,
-    simCarrier: deviceSimCarrier.trim() || undefined,
-    connectionType: deviceConnectionType,
-    status: deviceStatus,
-    notes: deviceNotes.trim() || undefined,
-  }),
-});
+for (let index = 0; index < companyDevices.length; index += 1) {
+  const device = companyDevices[index];
 
-const deviceData = await deviceResponse.json();
+  const deviceResponse = await fetch(`${API_URL}/devices`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      companyId: newCompanyId,
+      phoneNumber: device.phoneNumber.trim(),
+      imei: device.imei.trim() || undefined,
+      manufacturer: device.manufacturer.trim() || undefined,
+      model: device.model.trim() || undefined,
+      androidVersion: device.androidVersion.trim() || undefined,
+      simCarrier: device.simCarrier.trim() || undefined,
+      connectionType: device.connectionType,
+      status: device.status,
+      notes: device.notes.trim() || undefined,
+    }),
+  });
 
-if (!deviceResponse.ok) {
-  const deviceMessage = Array.isArray(deviceData.message)
-    ? deviceData.message.join(' ')
-    : deviceData.message;
+  const deviceData = await deviceResponse.json();
 
-  throw new Error(
-    `A empresa foi cadastrada, mas houve erro ao cadastrar o celular: ${
-      deviceMessage || 'verifique os dados do aparelho.'
-    }`
-  );
+  if (!deviceResponse.ok) {
+    const deviceMessage = Array.isArray(deviceData.message)
+      ? deviceData.message.join(' ')
+      : deviceData.message;
+
+    throw new Error(
+      `A empresa foi cadastrada, mas houve erro ao cadastrar o celular ${
+        index + 1
+      }: ${deviceMessage || 'verifique os dados do aparelho.'}`,
+    );
+  }
 }
 
-setCompaniesSuccess('Empresa e celular cadastrados com sucesso.');
+setCompaniesSuccess(
+  companyDevices.length === 1
+    ? 'Empresa e celular cadastrados com sucesso!'
+    : `Empresa e ${companyDevices.length} celulares cadastrados com sucesso!`,
+);
 
 await loadCompanies();
 await loadDevices();
@@ -1231,91 +1310,150 @@ useEffect(() => {
                 onChange={(event) => setCompanyNotes(event.target.value)}
                 rows={4}
               />
-
 <hr />
 
-<h3>Dados do Celular</h3>
+<h3>Dados dos Celulares</h3>
 
-<label htmlFor="company-device-phone">Número do celular *</label>
-<input
-  id="company-device-phone"
-  type="tel"
-  value={devicePhoneNumber}
-  onChange={(event) => setDevicePhoneNumber(event.target.value)}
-  required
-/>
+{companyDevices.map((device, index) => (
+  <div key={index} className="company-device-block">
+    <div className="company-device-header">
+      <strong>Celular {index + 1}</strong>
 
-<label htmlFor="company-device-imei">IMEI ou identificador</label>
-<input
-  id="company-device-imei"
-  type="text"
-  value={deviceImei}
-  onChange={(event) => setDeviceImei(event.target.value)}
-/>
+      {companyDevices.length > 1 && (
+        <button
+          type="button"
+          onClick={() => removeCompanyDevice(index)}
+        >
+          Remover celular
+        </button>
+      )}
+    </div>
 
-<label htmlFor="company-device-manufacturer">Fabricante</label>
-<input
-  id="company-device-manufacturer"
-  type="text"
-  value={deviceManufacturer}
-  onChange={(event) => setDeviceManufacturer(event.target.value)}
-/>
+    <label htmlFor={`company-device-phone-${index}`}>
+      Número do celular *
+    </label>
+    <input
+      id={`company-device-phone-${index}`}
+      type="tel"
+      value={device.phoneNumber}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'phoneNumber', event.target.value)
+      }
+      required
+    />
 
-<label htmlFor="company-device-model">Modelo</label>
-<input
-  id="company-device-model"
-  type="text"
-  value={deviceModel}
-  onChange={(event) => setDeviceModel(event.target.value)}
-/>
+    <label htmlFor={`company-device-imei-${index}`}>
+      IMEI ou identificador
+    </label>
+    <input
+      id={`company-device-imei-${index}`}
+      type="text"
+      value={device.imei}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'imei', event.target.value)
+      }
+    />
 
-<label htmlFor="company-device-android">Versão Android</label>
-<input
-  id="company-device-android"
-  type="text"
-  value={deviceAndroidVersion}
-  onChange={(event) => setDeviceAndroidVersion(event.target.value)}
-/>
+    <label htmlFor={`company-device-manufacturer-${index}`}>
+      Fabricante
+    </label>
+    <input
+      id={`company-device-manufacturer-${index}`}
+      type="text"
+      value={device.manufacturer}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'manufacturer', event.target.value)
+      }
+    />
 
-<label htmlFor="company-device-carrier">Operadora</label>
-<input
-  id="company-device-carrier"
-  type="text"
-  value={deviceSimCarrier}
-  onChange={(event) => setDeviceSimCarrier(event.target.value)}
-/>
+    <label htmlFor={`company-device-model-${index}`}>
+      Modelo
+    </label>
+    <input
+      id={`company-device-model-${index}`}
+      type="text"
+      value={device.model}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'model', event.target.value)
+      }
+    />
 
-<label htmlFor="company-device-connection">Tipo de conexão</label>
-<select
-  id="company-device-connection"
-  value={deviceConnectionType}
-  onChange={(event) =>
-    setDeviceConnectionType(
-      event.target.value as 'UNKNOWN' | 'WIFI' | 'MOBILE'
-    )
-  }
+    <label htmlFor={`company-device-android-${index}`}>
+      Versão Android
+    </label>
+    <input
+      id={`company-device-android-${index}`}
+      type="text"
+      value={device.androidVersion}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'androidVersion', event.target.value)
+      }
+    />
+
+    <label htmlFor={`company-device-carrier-${index}`}>
+      Operadora
+    </label>
+    <input
+      id={`company-device-carrier-${index}`}
+      type="text"
+      value={device.simCarrier}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'simCarrier', event.target.value)
+      }
+    />
+
+    <label htmlFor={`company-device-connection-${index}`}>
+      Tipo de conexão
+    </label>
+    <select
+      id={`company-device-connection-${index}`}
+      value={device.connectionType}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'connectionType', event.target.value)
+      }
+    >
+      <option value="UNKNOWN">Desconhecida</option>
+      <option value="WIFI">Wi-Fi</option>
+      <option value="MOBILE">Móvel</option>
+    </select>
+
+    <label htmlFor={`company-device-status-${index}`}>
+      Status do aparelho
+    </label>
+    <select
+      id={`company-device-status-${index}`}
+      value={device.status}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'status', event.target.value)
+      }
+    >
+      <option value="ACTIVE">Ativo</option>
+      <option value="INACTIVE">Inativo</option>
+      <option value="BLOCKED">Bloqueado</option>
+    </select>
+
+    <label htmlFor={`company-device-notes-${index}`}>
+      Observações do celular
+    </label>
+    <textarea
+      id={`company-device-notes-${index}`}
+      value={device.notes}
+      onChange={(event) =>
+        updateCompanyDevice(index, 'notes', event.target.value)
+      }
+      rows={3}
+    />
+  </div>
+))}
+
+<button
+  type="button"
+  onClick={addCompanyDevice}
 >
-  <option value="UNKNOWN">Desconhecida</option>
-  <option value="WIFI">Wi-Fi</option>
-  <option value="MOBILE">Móvel</option>
-</select>
+  + Adicionar outro celular
+</button>
 
-<label htmlFor="company-device-status">Status do aparelho</label>
-<select
-  id="company-device-status"
-  value={deviceStatus}
-  onChange={(event) =>
-    setDeviceStatus(
-      event.target.value as 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
-    )
-  }
->
-  <option value="ACTIVE">Ativo</option>
-  <option value="INACTIVE">Inativo</option>
-  <option value="BLOCKED">Bloqueado</option>
-</select>
-
-              {companyFormError && (
+         {companyFormError && (
                 <div className="error-message">{companyFormError}</div>
               )}
 

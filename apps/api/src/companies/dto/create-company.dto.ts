@@ -25,8 +25,9 @@ export class CreateCompanyDto {
   @IsEnum(DocumentType)
   documentType!: DocumentType;
 
-  @IsUUID()
-  holderId!: string;
+  @IsOptional()
+@IsUUID()
+holderId?: string;
 
   @IsOptional()
   @IsString()
