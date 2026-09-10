@@ -109,6 +109,7 @@ function App() {
 });
 
   const [showCompanies, setShowCompanies] = useState(false);
+const [showPayments, setShowPayments] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserName, setNewUserName] = useState('');
 const [newUserEmail, setNewUserEmail] = useState('');
@@ -2406,6 +2407,46 @@ if (showHolders) {
     );
   }
 
+// TELA DE PAGAMENTOS
+if (showPayments) {
+  return (
+    <div className="dashboard-page">
+      <header className="dashboard-header">
+        <div>
+          <div className="dashboard-logo">MIL</div>
+
+          <div>
+            <h1>Central de Operações</h1>
+            <span>Gestão de Pagamentos</span>
+          </div>
+        </div>
+
+        <button
+          className="logout-button"
+          onClick={() => setShowPayments(false)}
+        >
+          ← Início
+        </button>
+      </header>
+
+      <main className="dashboard-content">
+        <section className="welcome-card">
+          <div className="companies-title">
+            <div>
+              <span className="badge">FINANCEIRO</span>
+              <h2>Pagamentos</h2>
+            </div>
+          </div>
+
+          <p>
+            Gerencie beneficiários, pagamentos mensais e vencimentos.
+          </p>
+        </section>
+      </main>
+    </div>
+  );
+}
+
   // TELA DE EMPRESAS
   if (showCompanies) {
     return (
@@ -3032,6 +3073,14 @@ return (
           <strong>Marketplaces</strong>
           <span>Monitorar status das contas</span>
         </button>
+
+        <button
+  className="module-card"
+  onClick={() => setShowPayments(true)}
+>
+  <strong>Pagamentos</strong>
+  <span>Gerenciar beneficiários e pagamentos</span>
+</button>
 
         <button
   className="module-card"
