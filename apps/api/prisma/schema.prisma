@@ -140,6 +140,7 @@ state        String?
   devices             Device[]
   driverCompanies     DriverCompany[]
   marketplaceAccounts CompanyMarketplaceAccount[]
+  payments              Payment[]
   userAccess          UserCompanyAccess[]
 
   @@index([status])
@@ -478,4 +479,69 @@ enum AuditSource {
   API
   AGENT
   SYSTEM
+}
+
+enum PaymentCategory {
+  PJ
+  ACCOUNTING
+  TEAM
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PixKeyType {
+  CPF
+  CNPJ
+  EMAIL
+  PHONE
+  RANDOM
+}
+
+model PaymentBeneficiary {
+  payments Payment[]
+
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  document  String?
+  pixKey    String?    @map("pix_key")
+  pixKeyType PixKeyType? @map("pix_key_type")
+  bankName  String?    @map("bank_name")
+  notes     String?
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@map("payment_beneficiaries")
+}
+
+model Payment {
+  id            String          @id @default(uuid()) @db.Uuid
+  beneficiaryId String          @map("beneficiary_id") @db.Uuid
+  companyId     String?         @map("company_id") @db.Uuid
+  category      PaymentCategory
+  description   String?
+  amount        Decimal         @db.Decimal(12, 2)
+  dueDay        Int?            @map("due_day")
+  referenceMonth Int            @map("reference_month")
+  referenceYear  Int            @map("reference_year")
+  status        PaymentStatus   @default(PENDING)
+  paidAt        DateTime?       @map("paid_at")
+  notes         String?
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  beneficiary PaymentBeneficiary @relation(fields: [beneficiaryId], references: [id])
+  company     Company?           @relation(fields: [companyId], references: [id])
+
+  @@index([beneficiaryId])
+  @@index([companyId])
+  @@index([status])
+  @@index([referenceYear, referenceMonth])
+  @@map("payments")
 }
