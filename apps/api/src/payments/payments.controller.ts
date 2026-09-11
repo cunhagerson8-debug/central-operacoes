@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -28,6 +30,12 @@ export class PaymentsController {
   findAllBeneficiaries() {
     return this.paymentsService.findAllBeneficiaries();
   }
+
+  @Delete('beneficiaries/:id')
+@Permissions('payment.create')
+deleteBeneficiary(@Param('id') id: string) {
+  return this.paymentsService.deleteBeneficiary(id);
+}
 
   @Post()
   @Permissions('payment.create')

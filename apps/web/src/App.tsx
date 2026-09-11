@@ -603,7 +603,50 @@ async function createPaymentBeneficiary() {
   }
 }
 
+async function deletePaymentBeneficiary(id: string, name: string) {
+  const token = localStorage.getItem('accessToken');
 
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Deseja realmente excluir o beneficiário "${name}"?`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/payments/beneficiaries/${id}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível excluir o beneficiário.',
+      );
+    }
+
+    await loadPaymentBeneficiaries();
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao excluir o beneficiário.',
+    );
+  }
+}
 
   async function loadCompanies() {
     const token = localStorage.getItem('accessToken');
@@ -2722,12 +2765,28 @@ if (showPayments) {
       <span>Agência: {beneficiary.agency || 'Não informada'}</span>
     </div>
 
-    <div>
-      <span>Conta: {beneficiary.account || 'Não informada'}</span>
-    </div>
-  </div>
+   <div>
+  <span>Conta: {beneficiary.account || 'Não informada'}</span>
+</div>
+
+<button
+  type="button"
+  className="payment-delete-button"
+  onClick={() =>
+    deletePaymentBeneficiary(
+      beneficiary.id,
+      beneficiary.name,
+    )
+  }
+>
+  Excluir
+</button>
+</div>
+
+  
 ))}
   </div>
+  
 )}
 
         </section>

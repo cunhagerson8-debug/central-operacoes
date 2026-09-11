@@ -30,6 +30,12 @@ export class PaymentsService {
     });
   }
 
+  async deleteBeneficiary(id: string) {
+  return this.prisma.paymentBeneficiary.delete({
+    where: { id },
+  });
+}
+
 async createPayment(dto: CreatePaymentDto) {
   return this.prisma.payment.create({
     data: {
