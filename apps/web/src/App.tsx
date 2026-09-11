@@ -569,6 +569,8 @@ async function createPaymentBeneficiary() {
           document: newPaymentBeneficiaryDocument.trim() || undefined,
           pixKey: newPaymentBeneficiaryPixKey.trim() || undefined,
           bankName: newPaymentBeneficiaryBank.trim() || undefined,
+          agency: newPaymentBeneficiaryAgency.trim() || undefined,
+          account: newPaymentBeneficiaryAccount.trim() || undefined,
         }),
       },
     );
