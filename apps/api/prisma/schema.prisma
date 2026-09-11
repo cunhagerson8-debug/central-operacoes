@@ -512,6 +512,8 @@ model PaymentBeneficiary {
   pixKey    String?    @map("pix_key")
   pixKeyType PixKeyType? @map("pix_key_type")
   bankName  String?    @map("bank_name")
+  agency      String?
+account     String?
   notes     String?
   active    Boolean    @default(true)
   createdAt DateTime   @default(now()) @map("created_at")

@@ -25,6 +25,16 @@ export class CreatePaymentBeneficiaryDto {
   @IsEnum(PixKeyType)
   pixKeyType?: PixKeyType;
 
+    @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  agency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  account?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(120)

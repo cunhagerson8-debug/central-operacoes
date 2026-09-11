@@ -15,6 +15,8 @@ export class PaymentsService {
         pixKey: dto.pixKey?.trim(),
         pixKeyType: dto.pixKeyType,
         bankName: dto.bankName?.trim(),
+        agency: dto.agency?.trim(),
+        account: dto.account?.trim(),
         notes: dto.notes?.trim(),
       },
     });
