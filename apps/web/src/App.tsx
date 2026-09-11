@@ -2701,10 +2701,30 @@ if (showPayments) {
     <h3>Beneficiários cadastrados</h3>
 
     {paymentBeneficiaries.map((beneficiary) => (
-      <div key={beneficiary.id}>
-        <strong>{beneficiary.name}</strong>
-      </div>
-    ))}
+  <div key={beneficiary.id} className="payment-beneficiary-card">
+    <strong>{beneficiary.name}</strong>
+
+    <div>
+      <span>CPF/CNPJ: {beneficiary.document || 'Não informado'}</span>
+    </div>
+
+    <div>
+      <span>Chave PIX: {beneficiary.pixKey || 'Não informada'}</span>
+    </div>
+
+    <div>
+      <span>Banco: {beneficiary.bankName || 'Não informado'}</span>
+    </div>
+
+    <div>
+      <span>Agência: {beneficiary.agency || 'Não informada'}</span>
+    </div>
+
+    <div>
+      <span>Conta: {beneficiary.account || 'Não informada'}</span>
+    </div>
+  </div>
+))}
   </div>
 )}
 
