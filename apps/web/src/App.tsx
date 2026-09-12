@@ -694,7 +694,6 @@ console.log('Primeiras linhas da primeira aba:', firstRows.slice(0, 5));
   originalText: aiImportText.trim(),
   detectedType: 'Aguardando integração com IA',
   company: companyMatch?.[1]?.trim() || '',
-  document: '',
   document: companyDocumentMatch?.[1]?.trim() || '',
   beneficiary: beneficiaryMatch?.[1]?.trim() || '',
   beneficiaryDocument: beneficiaryDocumentMatch?.[1]?.trim() || '',
