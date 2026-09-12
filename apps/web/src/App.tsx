@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import * as XLSX from 'xlsx';
 import './App.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -110,6 +111,12 @@ function App() {
 
   const [showCompanies, setShowCompanies] = useState(false);
 const [showPayments, setShowPayments] = useState(false);
+const [showAiImport, setShowAiImport] = useState(false);
+const [aiImportText, setAiImportText] = useState('');
+const [aiImportLoading, setAiImportLoading] = useState(false);
+const [aiImportError, setAiImportError] = useState('');
+const [aiImportPreview, setAiImportPreview] = useState<any>(null);
+const [aiImportFile, setAiImportFile] = useState<File | null>(null);
 const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<any[]>([]);
 const [paymentBeneficiariesLoading, setPaymentBeneficiariesLoading] = useState(false);
 const [paymentBeneficiariesError, setPaymentBeneficiariesError] = useState('');
@@ -611,6 +618,8 @@ async function deletePaymentBeneficiary(id: string, name: string) {
     return;
   }
 
+
+  
   const confirmed = window.confirm(
     `Deseja realmente excluir o beneficiário "${name}"?`,
   );
@@ -645,6 +654,59 @@ async function deletePaymentBeneficiary(id: string, name: string) {
         ? err.message
         : 'Erro ao excluir o beneficiário.',
     );
+  }
+}
+async function analyzeAiImport() {
+  if (!aiImportText.trim() && !aiImportFile) {
+    setAiImportError('Cole os dados ou selecione uma planilha antes de analisar.');
+    setAiImportPreview(null);
+    return;
+  }
+
+  setAiImportLoading(true);
+  setAiImportError('');
+
+  try {
+    if (aiImportFile) {
+  const arrayBuffer = await aiImportFile.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+  console.log('Abas da planilha:', workbook.SheetNames);
+
+  const firstSheetName = workbook.SheetNames[1];
+const firstSheet = workbook.Sheets[firstSheetName];
+const firstRows = XLSX.utils.sheet_to_json(firstSheet, {
+  header: 1,
+  defval: '',
+});
+
+console.log('Primeiras linhas da primeira aba:', firstRows.slice(0, 5));
+}
+    const companyMatch = aiImportText.match(/Empresa:\s*(.+)/i);
+    const companyDocumentMatch = aiImportText.match(/CNPJ:\s*([0-9./-]+)/i);
+    const beneficiaryMatch = aiImportText.match(/Beneficiário:\s*(.+)/i);
+    const beneficiaryDocumentMatch = aiImportText.match(/CPF:\s*([0-9.-]+)/i);
+    const pixMatch = aiImportText.match(/PIX:\s*(.+)/i);
+    const paymentMatch = aiImportText.match(/Pagamento:\s*(.+)/i);
+    const marketplaceMatch = aiImportText.match(/Marketplace:\s*(.+)/i);
+    const phoneMatch = aiImportText.match(/Celular:\s*(.+)/i);
+    setAiImportPreview({
+  originalText: aiImportText.trim(),
+  detectedType: 'Aguardando integração com IA',
+  company: companyMatch?.[1]?.trim() || '',
+  document: '',
+  document: companyDocumentMatch?.[1]?.trim() || '',
+  beneficiary: beneficiaryMatch?.[1]?.trim() || '',
+  beneficiaryDocument: beneficiaryDocumentMatch?.[1]?.trim() || '',
+  pixKey: pixMatch?.[1]?.trim() || '',
+  paymentAmount: paymentMatch?.[1]?.trim() || '',
+  marketplace: marketplaceMatch?.[1]?.trim() || '',
+  phone: phoneMatch?.[1]?.trim() || '',
+});
+  } catch {
+    setAiImportError('Não foi possível analisar os dados.');
+  } finally {
+    setAiImportLoading(false);
   }
 }
 
@@ -2577,6 +2639,192 @@ if (showHolders) {
     );
   }
 
+// TELA DE IMPORTAÇÃO COM IA
+if (showAiImport) {
+  return (
+    <div className="dashboard-page">
+      <header className="dashboard-header">
+        <div>
+          <div className="dashboard-logo">MIL</div>
+
+          <div>
+            <h1>Central de Operações</h1>
+            <span>Importação Inteligente</span>
+          </div>
+        </div>
+
+        <button
+          className="logout-button"
+          onClick={() => setShowAiImport(false)}
+        >
+          ← Início
+        </button>
+      </header>
+
+      <main className="dashboard-content">
+        <section className="welcome-card">
+          <div className="companies-title">
+            <div>
+              <span className="badge">MIL IA</span>
+              <h2>Importação com IA</h2>
+            </div>
+          </div>
+
+          <p>
+            Cole abaixo os dados de empresas, beneficiários, pagamentos,
+            celulares ou marketplaces.
+          </p>
+
+          <textarea
+            rows={14}
+            value={aiImportText}
+            onChange={(e) => setAiImportText(e.target.value)}
+            placeholder="Cole aqui os dados que deseja importar..."
+            style={{
+              width: '100%',
+              marginTop: '20px',
+              padding: '16px',
+              borderRadius: '12px',
+              border: '1px solid #d8e0ea',
+              boxSizing: 'border-box',
+              resize: 'vertical',
+              fontSize: '15px',
+            }}
+          />
+
+<div style={{ marginTop: '16px', marginBottom: '8px' }}>
+  <input
+    type="file"
+    accept=".xlsx,.xls"
+    onChange={(e) => {
+      const file = e.target.files?.[0] || null;
+      setAiImportFile(file);
+    }}
+  />
+
+  {aiImportFile && (
+    <div style={{ marginTop: '8px', fontSize: '14px' }}>
+      📊 Planilha selecionada: <strong>{aiImportFile.name}</strong>
+    </div>
+  )}
+</div>
+          <button
+            type="button"
+            className="new-company-button"
+            style={{ marginTop: '16px' }}
+            onClick={analyzeAiImport}
+            disabled={aiImportLoading}
+          >
+            {aiImportLoading ? 'Analisando...' : '✨ Analisar com IA'}
+          </button>
+          {aiImportError && (
+  <div className="error-message" style={{ marginTop: '16px' }}>
+    {aiImportError}
+  </div>
+)}
+
+{aiImportPreview && (
+  <div
+    style={{
+      marginTop: '20px',
+      padding: '20px',
+      border: '1px solid #d8e0ea',
+      borderRadius: '12px',
+      background: '#ffffff',
+    }}
+  >
+   
+<div
+  style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: '16px',
+    marginBottom: '20px',
+  }}
+>
+  <div>
+    <div
+      style={{
+        display: 'inline-block',
+        padding: '6px 10px',
+        borderRadius: '999px',
+        background: '#e8f0ff',
+        fontSize: '12px',
+        fontWeight: 700,
+        marginBottom: '10px',
+      }}
+    >
+      ANÁLISE PRONTA
+    </div>
+
+    <h3 style={{ margin: 0 }}>Prévia da análise</h3>
+
+    <p style={{ margin: '6px 0 0', color: '#667085' }}>
+      Revise os dados antes de confirmar a importação.
+    </p>
+  </div>
+</div>
+
+<div
+  style={{
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: '14px',
+  }}
+>
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>Empresa</strong>
+    <div>{aiImportPreview.company || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>Beneficiário</strong>
+    <div>{aiImportPreview.beneficiary || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>CNPJ/CPF da empresa</strong>
+    <div>{aiImportPreview.document || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>CPF/CNPJ do beneficiário</strong>
+    <div>{aiImportPreview.beneficiaryDocument || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>PIX</strong>
+    <div>{aiImportPreview.pixKey || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>Pagamento</strong>
+    <div>{aiImportPreview.paymentAmount || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>Marketplace</strong>
+    <div>{aiImportPreview.marketplace || 'Não identificado'}</div>
+  </div>
+
+  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+    <strong>Celular</strong>
+    <div>{aiImportPreview.phone || 'Não identificado'}</div>
+  </div>
+</div>
+  </div>
+)}
+        </section>
+      </main>
+    </div>
+
+    
+  );
+}
+
+
+
 // TELA DE PAGAMENTOS
 if (showPayments) {
   return (
@@ -2808,24 +3056,8 @@ if (showPayments) {
               <span>Gestão de Empresas</span>
             </div>
           </div>
-
-          <button
-            className="logout-button"
-            onClick={() => setShowCompanies(false)}
-          >
-            ← Início
-          </button>
-        </header>
-
-        <main className="dashboard-content">
-          <section className="welcome-card">
-            <div className="companies-title">
-              <div>
-                <span className="badge">GESTÃO</span>
-
-                <h2>Empresas</h2>
-
-                <button
+</header>
+                 <button
   className="new-company-button"
                   onClick={() => {
                     setCompaniesSuccess('');
@@ -2834,91 +3066,14 @@ if (showPayments) {
 >
   + Nova Empresa
 </button>
-</div>
-</div>
-</section>
 
-<section className="welcome-card companies-search">
-  <form
-    onSubmit={(event) => {
-      event.preventDefault();
-
-      if (companiesPage !== 1) {
-        setCompaniesPage(1);
-      } else {
-        loadCompanies();
-      }
-    }}
-  >
-    <input
-      type="search"
-      placeholder="Buscar por nome, razão social ou CNPJ"
-      value={companySearch}
-      onChange={(event) => setCompanySearch(event.target.value)}
-    />
-
-    <button type="submit">
-      Buscar
-    </button>
-  </form>
-</section>
-
-          {companiesLoading && (
-            <section className="welcome-card">
-              <p>Carregando empresas...</p>
-            </section>
-          )}
-
-          {companiesError && (
-            <section className="welcome-card">
-              <div className="error-message">
-                {companiesError}
-              </div>
-            </section>
-          )}
-
-          {!companiesLoading &&
-            !companiesError &&
-            companies.length === 0 && (
-              <section className="welcome-card">
-                <p>Nenhuma empresa cadastrada.</p>
-              </section>
-            )}
-
-          {!companiesLoading &&
-            !companiesError &&
-            companies.length > 0 && (
-              <section className="companies-list">
-                {companies.map((company) => (
-                  <div
-                    className="company-row"
-                    key={company.id}
-                  >
-                    <div>
-                      <strong>{company.name}</strong>
-
-                      <span>
-                        {company.document ||
-                          'Documento não informado'}
-                      </span>
-                    </div>
-
-                    <div className="company-status">
-                      {company.status || 'PENDING'}
-                    </div>
-                  </div>
-                ))}
-<div className="companies-pagination">
-  <span>
-    Total: {companiesTotal} empresas
-  </span>
-
-  <div>
-    <button
-      type="button"
-      disabled={companiesPage <= 1}
-      onClick={() => setCompaniesPage((page) => Math.max(1, page - 1))}
-    >
+<button
+  type="button"
+  disabled={companiesPage <= 1}
+  onClick={() =>
+    setCompaniesPage((page) => Math.max(1, page - 1))
+  }
+>
       Anterior
     </button>
 
@@ -2938,15 +3093,9 @@ if (showPayments) {
       Próxima
     </button>
   </div>
-</div>
-
-              </section>
-              
-            )}
-        </main>
-      </div>
-    );
-  }
+  );
+}
+  
 
   // DASHBOARD
 const totalCompanies = companies.length;
@@ -2963,7 +3112,7 @@ const totalDevices = devices.length;
 const onlineDevices = devices.filter(
   (device) => device.currentStatus?.isOnline === true,
 ).length;
-
+''
 const offlineDevices = devices.filter(
   (device) => device.currentStatus?.isOnline !== true,
 ).length;
@@ -3421,6 +3570,14 @@ return (
           <strong>Marketplaces</strong>
           <span>Monitorar status das contas</span>
         </button>
+
+<button
+  className="module-card"
+  onClick={() => setShowAiImport(true)}
+>
+  <strong>✨ Importação com IA</strong>
+  <span>Colar dados para análise e cadastro inteligente</span>
+</button>
 
         <button
   className="module-card"
