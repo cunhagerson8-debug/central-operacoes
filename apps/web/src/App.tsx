@@ -12,6 +12,9 @@ type Company = {
   documentType?: string;
   status?: string;
   notes?: string;
+  holderId?: string;
+  phone?: string;
+  email?: string;
 };
 
 type Holder = {
@@ -110,6 +113,7 @@ function App() {
 });
 
   const [showCompanies, setShowCompanies] = useState(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
 const [showPayments, setShowPayments] = useState(false);
 const [showAiImport, setShowAiImport] = useState(false);
 const [aiImportText, setAiImportText] = useState('');
@@ -148,8 +152,8 @@ const [newUserError, setNewUserError] = useState('');
   const [, setCompaniesTotal] = useState(0);
   const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
   const [companySearch] = useState('');
-  const [, setCompaniesLoading] = useState(false);
-  const [, setCompaniesError] = useState('');
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companiesError, setCompaniesError] = useState('');
   const [showNewCompany, setShowNewCompany] = useState(false);
   const [holders, setHolders] = useState<Holder[]>([]);
   const [holdersLoading, setHoldersLoading] = useState(false);
@@ -667,43 +671,244 @@ async function analyzeAiImport() {
   setAiImportError('');
 
   try {
+    // PLANILHA EXCEL
     if (aiImportFile) {
-  const arrayBuffer = await aiImportFile.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const arrayBuffer = await aiImportFile.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-  console.log('Abas da planilha:', workbook.SheetNames);
+      // Prioriza a aba principal "资料"
+      const targetSheetName =
+        workbook.SheetNames.find((name) => name === '资料') ??
+        workbook.SheetNames[1] ??
+        workbook.SheetNames[0];
 
-  const firstSheetName = workbook.SheetNames[1];
-const firstSheet = workbook.Sheets[firstSheetName];
-const firstRows = XLSX.utils.sheet_to_json(firstSheet, {
-  header: 1,
-  defval: '',
+      if (!targetSheetName) {
+        throw new Error('A planilha não possui abas válidas.');
+      }
+
+      const sheet = workbook.Sheets[targetSheetName];
+
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+        header: 1,
+        defval: '',
+      });
+
+      // Nesta planilha as linhas 1 e 2 são cabeçalhos.
+      // A primeira empresa real começa na linha 3: A501 - ANDGUSSO.
+      const dataRows = rows.slice(2).filter((row) => {
+        const companyNumber = String(row?.[1] ?? '').trim();
+        const companyName = String(row?.[2] ?? '').trim();
+
+        return companyNumber !== '' || companyName !== '';
+      });
+
+      const rowValue = (row: unknown[], index: number) =>
+  String(row?.[index] ?? '').trim();
+
+const companiesPreview = dataRows.map((row) => {
+  const companyNumber = rowValue(row, 1);
+  const companyName = rowValue(row, 2);
+
+  const marketplaces = [
+    { name: 'Shopee', status: rowValue(row, 7) },
+    { name: 'Mercado Livre', status: rowValue(row, 8) },
+    { name: 'TikTok Shop', status: rowValue(row, 9) },
+    { name: 'Temu', status: rowValue(row, 10) },
+  ]
+    .filter(({ status }) => {
+      const normalized = status.toLowerCase();
+
+      return (
+        status === '√' ||
+        normalized === 'sim' ||
+        normalized === 'ativo' ||
+        normalized === 'ok'
+      );
+    })
+    .map(({ name }) => name);
+
+  return {
+    number: companyNumber,
+    name: companyName,
+    company: [companyNumber, companyName].filter(Boolean).join(' - '),
+    phone: rowValue(row, 21),
+    marketplaces,
+  };
 });
 
-console.log('Primeiras linhas da primeira aba:', firstRows.slice(0, 5));
+if (companiesPreview.length === 0) {
+  throw new Error('Nenhuma empresa foi encontrada na aba principal.');
 }
+
+const firstCompany = companiesPreview[0];
+
+setAiImportPreview({
+  originalText: `Arquivo: ${aiImportFile.name} | Aba: ${targetSheetName}`,
+  detectedType: 'Planilha de empresas',
+  company: firstCompany.company,
+  document: '',
+  beneficiary: '',
+  beneficiaryDocument: '',
+  pixKey: '',
+  paymentAmount: '',
+  marketplace: firstCompany.marketplaces.join(', '),
+  phone: firstCompany.phone,
+
+  totalCompanies: companiesPreview.length,
+  companies: companiesPreview,
+});
+
+return;
+    }
+    // TEXTO COLADO MANUALMENTE
     const companyMatch = aiImportText.match(/Empresa:\s*(.+)/i);
-    const companyDocumentMatch = aiImportText.match(/CNPJ:\s*([0-9./-]+)/i);
+    const companyDocumentMatch = aiImportText.match(
+      /CNPJ:\s*([0-9./-]+)/i,
+    );
     const beneficiaryMatch = aiImportText.match(/Beneficiário:\s*(.+)/i);
-    const beneficiaryDocumentMatch = aiImportText.match(/CPF:\s*([0-9.-]+)/i);
+    const beneficiaryDocumentMatch = aiImportText.match(
+      /CPF:\s*([0-9.-]+)/i,
+    );
     const pixMatch = aiImportText.match(/PIX:\s*(.+)/i);
     const paymentMatch = aiImportText.match(/Pagamento:\s*(.+)/i);
     const marketplaceMatch = aiImportText.match(/Marketplace:\s*(.+)/i);
     const phoneMatch = aiImportText.match(/Celular:\s*(.+)/i);
+
     setAiImportPreview({
-  originalText: aiImportText.trim(),
-  detectedType: 'Aguardando integração com IA',
-  company: companyMatch?.[1]?.trim() || '',
-  document: companyDocumentMatch?.[1]?.trim() || '',
-  beneficiary: beneficiaryMatch?.[1]?.trim() || '',
-  beneficiaryDocument: beneficiaryDocumentMatch?.[1]?.trim() || '',
-  pixKey: pixMatch?.[1]?.trim() || '',
-  paymentAmount: paymentMatch?.[1]?.trim() || '',
-  marketplace: marketplaceMatch?.[1]?.trim() || '',
-  phone: phoneMatch?.[1]?.trim() || '',
-});
-  } catch {
-    setAiImportError('Não foi possível analisar os dados.');
+      originalText: aiImportText.trim(),
+      detectedType: 'Dados colados manualmente',
+      company: companyMatch?.[1]?.trim() || '',
+      document: companyDocumentMatch?.[1]?.trim() || '',
+      beneficiary: beneficiaryMatch?.[1]?.trim() || '',
+      beneficiaryDocument: beneficiaryDocumentMatch?.[1]?.trim() || '',
+      pixKey: pixMatch?.[1]?.trim() || '',
+      paymentAmount: paymentMatch?.[1]?.trim() || '',
+      marketplace: marketplaceMatch?.[1]?.trim() || '',
+      phone: phoneMatch?.[1]?.trim() || '',
+    });
+  } catch (err) {
+    setAiImportError(
+      err instanceof Error
+        ? err.message
+        : 'Não foi possível analisar os dados.',
+    );
+    setAiImportPreview(null);
+  } finally {
+    setAiImportLoading(false);
+  }
+}
+
+async function confirmAiCompanyImport() {
+  if (
+    !aiImportPreview ||
+    !Array.isArray(aiImportPreview.companies) ||
+    aiImportPreview.companies.length === 0
+  ) {
+    setAiImportError('Nenhuma empresa encontrada para importação.');
+    return;
+  }
+
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setAiImportLoading(true);
+  setAiImportError('');
+
+  let imported = 0;
+  let failed = 0;
+
+  try {
+    for (const company of aiImportPreview.companies) {
+      try {
+       const companyNumber = String(company.number || '').trim();
+const companyName = String(company.name || '').trim();
+
+if (!companyNumber || !companyName) {
+  failed++;
+  continue;
+}
+
+        const response = await fetch(`${API_URL}/companies`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: companyName,
+            legalName: companyName,
+            ddocument: companyNumber,
+documentType: 'INTERNAL',
+            phone: String(company.phone || '').trim() || undefined,
+            notes: 'Importado automaticamente pela Importação com IA',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+
+          console.error(
+            'Erro ao importar empresa:',
+            companyName,
+            errorData,
+          );
+
+          failed++;
+          continue;
+        }
+
+        const createdCompany = await response.json();
+
+        // Se houver celular na planilha, cadastra o aparelho.
+        if (company.phone && createdCompany?.id) {
+          const deviceResponse = await fetch(`${API_URL}/devices`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              companyId: createdCompany.id,
+              phoneNumber: String(company.phone).trim(),
+            }),
+          });
+
+          if (!deviceResponse.ok) {
+            console.error(
+              'Empresa criada, mas houve erro ao cadastrar celular:',
+              companyName,
+            );
+          }
+        }
+
+        imported++;
+      } catch (companyError) {
+        console.error('Erro durante importação:', companyError);
+        failed++;
+      }
+    }
+
+    await loadCompanies();
+    await loadDevices();
+
+    if (failed === 0) {
+      setAiImportError('');
+      alert(`${imported} empresas importadas com sucesso!`);
+    } else {
+      alert(
+        `Importação concluída: ${imported} empresas importadas e ${failed} com erro.`,
+      );
+    }
+  } catch (err) {
+    setAiImportError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao importar as empresas.',
+    );
   } finally {
     setAiImportLoading(false);
   }
@@ -1162,6 +1367,20 @@ setDevicesTotalPages(data.totalPages ?? 1);
     setCompanyFormError('');
   }
 
+function editCompany(company: Company) {
+  setEditingCompanyId(company.id);
+  setCompanyName(company.name || '');
+  setCompanyLegalName(company.legalName || '');
+  setCompanyDocument(company.document || '');
+  setCompanyDocumentType(company.documentType || 'CNPJ');
+  setCompanyHolderId(company.holderId || '');
+  setCompanyPhone(company.phone || '');
+  setCompanyEmail(company.email || '');
+  setCompanyNotes(company.notes || '');
+  setCompanyFormError('');
+  setShowNewCompany(true);
+}
+
   async function handleCreateCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCompanyFormError('');
@@ -1194,8 +1413,12 @@ if (!hasValidDevice) {
     setCompanyFormLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/companies`, {
-        method: 'POST',
+      const response = await fetch(
+  editingCompanyId
+    ? `${API_URL}/companies/${editingCompanyId}`
+    : `${API_URL}/companies`,
+  {
+    method: editingCompanyId ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
@@ -1288,6 +1511,7 @@ setCompaniesSuccess(
 await loadCompanies();
 await loadDevices();
 
+setEditingCompanyId(null);
 resetCompanyForm();
 resetDeviceForm();
 
@@ -2765,6 +2989,105 @@ if (showAiImport) {
   </div>
 </div>
 
+{aiImportPreview.totalCompanies > 0 &&
+  Array.isArray(aiImportPreview.companies) && (
+    <div
+      style={{
+        marginBottom: '20px',
+        padding: '16px',
+        border: '1px solid #d8e0ea',
+        borderRadius: '12px',
+        background: '#f8fafc',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+        }}
+      >
+        <strong>Empresas encontradas na planilha</strong>
+
+        <span
+          style={{
+            fontWeight: 700,
+            fontSize: '18px',
+          }}
+        >
+          {aiImportPreview.totalCompanies}
+        </span>
+      </div>
+
+      <div
+        style={{
+          maxHeight: '320px',
+          overflowY: 'auto',
+          borderTop: '1px solid #e5e7eb',
+        }}
+      >
+        {aiImportPreview.companies.map(
+          (company: any, index: number) => (
+            <div
+              key={`${company.number}-${index}`}
+              style={{
+                padding: '10px 4px',
+                borderBottom: '1px solid #e5e7eb',
+              }}
+            >
+              <div style={{ fontWeight: 700 }}>
+                {company.company || `Empresa ${index + 1}`}
+              </div>
+
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: '#667085',
+                  marginTop: '4px',
+                }}
+              >
+                Celular: {company.phone || 'Não informado'}
+              </div>
+
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: '#667085',
+                  marginTop: '2px',
+                }}
+              >
+                Marketplaces:{' '}
+                {company.marketplaces?.length
+                  ? company.marketplaces.join(', ')
+                  : 'Nenhum identificado'}
+              </div>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  )}
+
+{aiImportPreview.totalCompanies > 0 &&
+  Array.isArray(aiImportPreview.companies) && (
+    <div
+      style={{
+        marginBottom: '20px',
+        display: 'flex',
+        justifyContent: 'flex-end',
+      }}
+    >
+      <button
+        type="button"
+        className="new-company-button"
+        onClick={confirmAiCompanyImport}
+      >
+        Confirmar importação das {aiImportPreview.totalCompanies} empresas
+      </button>
+    </div>
+  )}
+
 <div
   style={{
     display: 'grid',
@@ -3065,6 +3388,62 @@ if (showPayments) {
 >
   + Nova Empresa
 </button>
+
+{companiesLoading && (
+  <section className="welcome-card">
+    <p>Carregando empresas...</p>
+  </section>
+)}
+
+{companiesError && (
+  <section className="welcome-card">
+    <div className="error-message">{companiesError}</div>
+  </section>
+)}
+
+{!companiesLoading && !companiesError && companies.length === 0 && (
+  <section className="welcome-card">
+    <p>Nenhuma empresa cadastrada.</p>
+  </section>
+)}
+
+{!companiesLoading && !companiesError && companies.length > 0 && (
+  <section className="companies-list">
+    {companies.map((company) => (
+      <div className="company-row" key={company.id}>
+        <div>
+          <strong>{company.name}</strong>
+
+          <div>
+            {company.document || 'Documento não informado'}
+          </div>
+
+          <div>
+            {company.phone || 'Telefone não informado'}
+          </div>
+
+          <div>
+            {company.email || 'E-mail não informado'}
+          </div>
+        </div>
+
+        <div>
+          <div className="company-status">
+            {company.status || 'ACTIVE'}
+          </div>
+
+          <button
+            type="button"
+            className="new-company-button"
+            onClick={() => editCompany(company)}
+          >
+            Editar
+          </button>
+        </div>
+      </div>
+    ))}
+  </section>
+)}
 
 <button
   type="button"

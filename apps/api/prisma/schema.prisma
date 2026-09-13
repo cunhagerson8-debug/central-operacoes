@@ -435,6 +435,7 @@ enum CompanyStatus {
 enum DocumentType {
   CPF
   CNPJ
+  INTERNAL
 }
 
 enum DeviceStatus {
