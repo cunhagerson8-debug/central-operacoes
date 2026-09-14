@@ -529,6 +529,8 @@ model Payment {
   companyId     String?         @map("company_id") @db.Uuid
   category      PaymentCategory
   description   String?
+  payer         String?
+  client        String?
   amount        Decimal         @db.Decimal(12, 2)
   dueDay        Int?            @map("due_day")
   referenceMonth Int            @map("reference_month")

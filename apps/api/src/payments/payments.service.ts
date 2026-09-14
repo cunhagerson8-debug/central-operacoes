@@ -43,6 +43,8 @@ async createPayment(dto: CreatePaymentDto) {
       companyId: dto.companyId,
       category: dto.category,
       description: dto.description?.trim(),
+      payer: dto.payer?.trim(),
+      client: dto.client?.trim(),
       amount: dto.amount,
       dueDay: dto.dueDay,
       referenceMonth: dto.referenceMonth,

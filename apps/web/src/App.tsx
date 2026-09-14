@@ -124,6 +124,9 @@ const [aiImportFile, setAiImportFile] = useState<File | null>(null);
 const [paymentBeneficiaries, setPaymentBeneficiaries] = useState<any[]>([]);
 const [paymentBeneficiariesLoading, setPaymentBeneficiariesLoading] = useState(false);
 const [paymentBeneficiariesError, setPaymentBeneficiariesError] = useState('');
+const [payments, setPayments] = useState<any[]>([]);
+const [paymentsLoading, setPaymentsLoading] = useState(false);
+const [paymentsError, setPaymentsError] = useState('');
  const [showNewPaymentBeneficiary, setShowNewPaymentBeneficiary] = useState(false);
 const [newPaymentBeneficiaryName, setNewPaymentBeneficiaryName] = useState('');
 const [newPaymentBeneficiaryDocument, setNewPaymentBeneficiaryDocument] = useState('');
@@ -574,6 +577,44 @@ async function loadPaymentBeneficiaries() {
   }
 }
 
+async function loadPayments() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setPaymentsLoading(true);
+  setPaymentsError('');
+
+  try {
+    const response = await fetch(`${API_URL}/payments`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível carregar os pagamentos.',
+      );
+    }
+
+    setPayments(Array.isArray(data) ? data : []);
+  } catch (err) {
+    setPaymentsError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao carregar os pagamentos.',
+    );
+  } finally {
+    setPaymentsLoading(false);
+  }
+}
+
 async function createPaymentBeneficiary() {
   const token = localStorage.getItem('accessToken');
 
@@ -627,7 +668,7 @@ async function createPaymentBeneficiary() {
     setShowNewPaymentBeneficiary(false);
 
     await loadPaymentBeneficiaries();
-  } catch (err) {
+    } catch (err) {
     setNewPaymentBeneficiaryError(
       err instanceof Error
         ? err.message
@@ -717,6 +758,59 @@ async function analyzeAiImport() {
         defval: '',
       });
 
+
+const paymentSheet = workbook.Sheets['PAGAMENTOS'];
+
+if (paymentSheet) {
+  const paymentRows = XLSX.utils.sheet_to_json<unknown[]>(paymentSheet, {
+    header: 1,
+    defval: '',
+  });
+
+  let currentGroup = '';
+
+  const paymentPreview = paymentRows
+  .map((row) => {
+    const groupCell = String(row?.[0] ?? '').trim();
+
+if (groupCell) {
+  currentGroup = groupCell;
+}
+
+const group = currentGroup;
+    const dueDayRaw = String(row?.[1] ?? '').trim();
+    const product = String(row?.[2] ?? '').trim();
+    const amountRaw = row?.[3];
+    const client = String(row?.[4] ?? '').trim();
+    const months = String(row?.[5] ?? '').trim();
+
+    const amount =
+      typeof amountRaw === 'number'
+        ? amountRaw
+        : Number(
+            String(amountRaw ?? '')
+              .replace(/\./g, '')
+              .replace(',', '.')
+              .replace(/[^\d.-]/g, ''),
+          );
+
+    const dueDayMatch = dueDayRaw.match(/\d+/);
+    const dueDay = dueDayMatch ? Number(dueDayMatch[0]) : undefined;
+
+    return {
+      group,
+      dueDay,
+      product,
+      amount: Number.isFinite(amount) ? amount : 0,
+      client,
+      months,
+    };
+  })
+  .filter((item) => item.product && item.amount > 0);
+
+console.table(paymentPreview);
+
+  }
       // Nesta planilha as linhas 1 e 2 são cabeçalhos.
       // A primeira empresa real começa na linha 3: A501 - ANDGUSSO.
       const dataRows = rows.slice(2).filter((row) => {
@@ -1789,6 +1883,7 @@ setShowNewCompany(false);
   useEffect(() => {
   if (showPayments) {
     loadPaymentBeneficiaries();
+    loadPayments();
   }
 }, [showPayments]);
 
@@ -3623,6 +3718,65 @@ if (showPayments) {
 ))}
   </div>
   
+)}
+
+{paymentsLoading && (
+  <p>Carregando pagamentos...</p>
+)}
+
+{paymentsError && (
+  <div className="error-message">
+    {paymentsError}
+  </div>
+)}
+
+{!paymentsLoading && !paymentsError && payments.length === 0 && (
+  <p>Nenhum pagamento cadastrado.</p>
+)}
+
+{payments.length > 0 && (
+  <div>
+    <h3>Pagamentos cadastrados</h3>
+
+    {payments.map((payment) => (
+      <div
+        key={payment.id}
+        className="payment-beneficiary-card"
+      >
+        <strong>
+          {payment.beneficiary?.name || 'Beneficiário não informado'}
+        </strong>
+
+        <div>
+          Valor:{' '}
+          {Number(payment.amount || 0).toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+          })}
+        </div>
+
+        <div>
+          Categoria: {payment.category}
+        </div>
+
+        <div>
+          Descrição: {payment.description || 'Não informada'}
+        </div>
+
+        <div>
+          Vencimento: {payment.dueDay || 'A definir'}
+        </div>
+
+        <div>
+          Referência: {payment.referenceMonth}/{payment.referenceYear}
+        </div>
+
+        <div>
+          Status: {payment.status}
+        </div>
+      </div>
+    ))}
+  </div>
 )}
 
         </section>

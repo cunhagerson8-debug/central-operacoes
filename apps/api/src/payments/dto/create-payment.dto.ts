@@ -31,6 +31,16 @@ export class CreatePaymentDto {
   @MaxLength(255)
   description?: string;
 
+  @IsOptional()
+@IsString()
+@MaxLength(255)
+payer?: string;
+
+@IsOptional()
+@IsString()
+@MaxLength(255)
+client?: string;
+
   @IsNumber()
   @Min(0)
   amount!: number;
