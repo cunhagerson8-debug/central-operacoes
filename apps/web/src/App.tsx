@@ -148,8 +148,9 @@ const [newUserError, setNewUserError] = useState('');
   const [showDriverForm, setShowDriverForm] = useState(false);
   const [editingDriverId, setEditingDriverId] = useState<string | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [dashboardCompanies, setDashboardCompanies] = useState<Company[]>([]);
   const [companiesPage, setCompaniesPage] = useState(1);
-  const [, setCompaniesTotal] = useState(0);
+  const [companiesTotal, setCompaniesTotal] = useState(0);
   const [companiesTotalPages, setCompaniesTotalPages] = useState(1);
   const [companySearch] = useState('');
   const [companiesLoading, setCompaniesLoading] = useState(false);
@@ -241,6 +242,7 @@ const [companyDevices, setCompanyDevices] = useState<CompanyDeviceForm[]>([
   },
 ]);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [dashboardDevices, setDashboardDevices] = useState<Device[]>([]);
   const [devicesPage, setDevicesPage] = useState(1);
   const [devicesTotal, setDevicesTotal] = useState(0);
   const [devicesTotalPages, setDevicesTotalPages] = useState(1);
@@ -828,7 +830,11 @@ async function confirmAiCompanyImport() {
 const companyName = String(company.name || '').trim();
 
 if (!companyNumber || !companyName) {
-  failed++;
+  console.warn(
+    'Linha ignorada por estar incompleta:',
+    companyNumber || '(sem código)',
+    companyName || '(sem nome)',
+  );
   continue;
 }
 
@@ -841,8 +847,8 @@ if (!companyNumber || !companyName) {
           body: JSON.stringify({
             name: companyName,
             legalName: companyName,
-            ddocument: companyNumber,
-documentType: 'INTERNAL',
+            document: `INT-${companyNumber}`,
+            documentType: 'INTERNAL',
             phone: String(company.phone || '').trim() || undefined,
             notes: 'Importado automaticamente pela Importação com IA',
           }),
@@ -878,13 +884,15 @@ documentType: 'INTERNAL',
           });
 
           if (!deviceResponse.ok) {
-            console.error(
-              'Empresa criada, mas houve erro ao cadastrar celular:',
-              companyName,
-            );
-          }
-        }
+  const deviceError = await deviceResponse.json().catch(() => null);
 
+  console.error(
+    'Empresa criada, mas houve erro ao cadastrar celular:',
+    companyName,
+    deviceError,
+  );
+}
+}
         imported++;
       } catch (companyError) {
         console.error('Erro durante importação:', companyError);
@@ -955,6 +963,51 @@ documentType: 'INTERNAL',
       setCompaniesLoading(false);
     }
   }
+
+  async function loadDashboardCompanies() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  try {
+    let page = 1;
+    let totalPages = 1;
+    const allCompanies: Company[] = [];
+
+    do {
+      const response = await fetch(
+        `${API_URL}/companies?page=${page}&limit=50&search=`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Não foi possível carregar as empresas do Dashboard.',
+        );
+      }
+
+      if (Array.isArray(data.data)) {
+        allCompanies.push(...data.data);
+      }
+
+      totalPages = data.totalPages ?? 1;
+      page++;
+    } while (page <= totalPages);
+
+    setDashboardCompanies(allCompanies);
+  } catch (err) {
+    console.error('Erro ao carregar empresas do Dashboard:', err);
+  }
+}
 
   async function loadHolders() {
     const token = localStorage.getItem('accessToken');
@@ -1193,6 +1246,51 @@ setDevicesTotalPages(data.totalPages ?? 1);
       setDevicesLoading(false);
     }
   }
+
+async function loadDashboardDevices() {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  try {
+    let page = 1;
+    let totalPages = 1;
+    const allDevices: Device[] = [];
+
+    do {
+      const response = await fetch(
+        `${API_URL}/devices?page=${page}&limit=50&search=`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || 'Não foi possível carregar os aparelhos do Dashboard.',
+        );
+      }
+
+      if (Array.isArray(data.data)) {
+        allDevices.push(...data.data);
+      }
+
+      totalPages = data.totalPages ?? 1;
+      page++;
+    } while (page <= totalPages);
+
+    setDashboardDevices(allDevices);
+  } catch (err) {
+    console.error('Erro ao carregar aparelhos do Dashboard:', err);
+  }
+}
 
   function resetDeviceForm() {
     setEditingDeviceId(null);
@@ -1584,11 +1682,13 @@ useEffect(() => {
 useEffect(() => {
   if (loggedIn) {
     loadCompanies();
+    loadDashboardCompanies();
     loadDrivers();
     loadDevices();
+    loadDashboardDevices();
     loadSms();
   }
-}, [loggedIn]);
+}, [loggedIn]);;
   
   useEffect(() => {
     if (showMarketplaces) loadMarketplaces();
@@ -2144,10 +2244,10 @@ useEffect(() => {
 
   // TELA DE APARELHOS
   if (showDevices) {
-    const onlineDevices = devices.filter((device) => device.currentStatus?.isOnline).length;
-    const criticalDevices = devices.filter((device) => device.batterySurvivalStatus === 'CRITICAL').length;
-    const emergencyDevices = devices.filter((device) => device.batterySurvivalStatus === 'EMERGENCY').length;
-    const staleLocationDevices = devices.filter(isLocationStale).length;
+    const onlineDevices = dashboardDevices.filter((device) => device.currentStatus?.isOnline).length;
+    const criticalDevices = dashboardDevices.filter((device) => device.batterySurvivalStatus === 'CRITICAL').length;
+    const emergencyDevices = dashboardDevices.filter((device) => device.batterySurvivalStatus === 'EMERGENCY').length;
+    const staleLocationDevices = dashboardDevices.filter(isLocationStale).length;
 
     return (
       <div className="dashboard-page">
@@ -2213,9 +2313,9 @@ useEffect(() => {
 </section>
 
           <section className="device-metrics">
-            <div><strong>{devices.length}</strong><span>Total de aparelhos</span></div>
+            <div><strong>{devicesTotal}</strong><span>Total de aparelhos</span></div>
             <div><strong>{onlineDevices}</strong><span>Online</span></div>
-            <div><strong>{devices.length - onlineDevices}</strong><span>Offline</span></div>
+            <div><strong>{devicesTotal - onlineDevices}</strong><span>Offline</span></div>
             <div><strong>{criticalDevices}</strong><span>Bateria crítica</span></div>
             <div><strong>{emergencyDevices}</strong><span>Emergência</span></div>
             <div><strong>{staleLocationDevices}</strong><span>Sem localização recente</span></div>
@@ -3367,6 +3467,26 @@ if (showPayments) {
 
   // TELA DE EMPRESAS
   if (showCompanies) {
+    const companiesWithDevice = new Set(
+  dashboardDevices.map((device) => device.companyId),
+).size;
+
+const companiesWithoutDevice = Math.max(
+  companiesTotal - companiesWithDevice,
+  0,
+);
+
+const pendingCompanies = dashboardCompanies.filter((company) => {
+  const hasDevice = dashboardDevices.some(
+    (device) => device.companyId === company.id,
+  );
+
+  const hasDocument = Boolean(company.document?.trim());
+  const hasPhone = Boolean(company.phone?.trim());
+  const hasEmail = Boolean(company.email?.trim());
+
+  return !hasDevice || !hasDocument || !hasPhone || !hasEmail;
+}).length;
     return (
       <div className="dashboard-page">
         <header className="dashboard-header">
@@ -3378,6 +3498,15 @@ if (showPayments) {
               <span>Gestão de Empresas</span>
             </div>
           </div>
+
+<button
+  type="button"
+  className="logout-button"
+  onClick={() => setShowCompanies(false)}
+>
+  ← Início
+</button>
+
 </header>
                  <button
   className="new-company-button"
@@ -3388,6 +3517,28 @@ if (showPayments) {
 >
   + Nova Empresa
 </button>
+
+<section className="device-metrics">
+  <div>
+    <strong>{companiesTotal}</strong>
+    <span>Total de empresas</span>
+  </div>
+
+  <div>
+    <strong>{companiesWithDevice}</strong>
+    <span>Com aparelho</span>
+  </div>
+
+  <div>
+    <strong>{companiesWithoutDevice}</strong>
+    <span>Sem aparelho</span>
+  </div>
+
+  <div>
+    <strong>{pendingCompanies}</strong>
+    <span>Pendentes</span>
+  </div>
+</section>
 
 {companiesLoading && (
   <section className="welcome-card">
@@ -3476,7 +3627,7 @@ if (showPayments) {
   
 
   // DASHBOARD
-const totalCompanies = companies.length;
+const totalCompanies = companiesTotal;
 const activeCompanies = companies.filter(
   (company) => company.status === 'ACTIVE',
 ).length;
@@ -3485,27 +3636,25 @@ const totalDrivers = drivers.length;
 const activeDrivers = drivers.filter(
   (driver) => driver.status === 'ACTIVE',
 ).length;
+const totalDevices = devicesTotal;
 
-const totalDevices = devices.length;
-const onlineDevices = devices.filter(
+const onlineDevices = dashboardDevices.filter(
   (device) => device.currentStatus?.isOnline === true,
 ).length;
-''
-const offlineDevices = devices.filter(
-  (device) => device.currentStatus?.isOnline !== true,
-).length;
 
-const criticalBatteryDevices = devices.filter((device) => {
+const offlineDevices = totalDevices - onlineDevices;
+
+const criticalBatteryDevices = dashboardDevices.filter((device) => {
   const battery = device.currentStatus?.batteryLevel;
   return battery !== null && battery !== undefined && battery >= 11 && battery <= 20;
 }).length;
 
-const emergencyBatteryDevices = devices.filter((device) => {
+const emergencyBatteryDevices = dashboardDevices.filter((device) => {
   const battery = device.currentStatus?.batteryLevel;
   return battery !== null && battery !== undefined && battery <= 10;
 }).length;
 
-const devicesWithoutRecentLocation = devices.filter((device) => {
+const devicesWithoutRecentLocation = dashboardDevices.filter((device) => {
   const lastLocationAt = device.currentStatus?.lastLocationAt;
 
   if (!lastLocationAt) return true;
@@ -3525,7 +3674,7 @@ const marketplaceProblems = marketplaceAccounts.filter((account) =>
 ).length;
 
 const attentionItems = [
-  ...devices
+  ...dashboardDevices
     .filter((device) => device.currentStatus?.isOnline !== true)
     .map((device) => ({
       type: 'Aparelho offline',
@@ -3535,7 +3684,7 @@ const attentionItems = [
       level: 'critical',
     })),
 
-  ...devices
+  ...dashboardDevices
     .filter((device) => {
       const battery = device.currentStatus?.batteryLevel;
       return battery !== null && battery !== undefined && battery <= 20;
@@ -3572,6 +3721,13 @@ const attentionItems = [
       level: 'critical',
     })),
 ];
+
+const attentionTotal =
+  offlineDevices +
+  criticalBatteryDevices +
+  emergencyBatteryDevices +
+  unreadSms +
+  marketplaceProblems;
 
 return (
   <div className="dashboard-page">
@@ -3702,7 +3858,7 @@ return (
             <h3>Central de Atenção</h3>
           </div>
 
-          <strong>{attentionItems.length}</strong>
+          <strong>{attentionTotal}</strong>
         </div>
 
         {attentionItems.length === 0 ? (
