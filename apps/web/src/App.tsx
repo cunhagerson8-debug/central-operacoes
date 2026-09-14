@@ -295,13 +295,23 @@ const [usersError, setUsersError] = useState('');
     try {
       const [marketplaceResponse, companiesResponse] = await Promise.all([
         fetch(`${API_URL}/marketplaces`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_URL}/companies`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/companies?page=1&limit=100&search=`, {
+  headers: { Authorization: `Bearer ${token}` },
+}),
       ]);
       const marketplaceData = await marketplaceResponse.json();
       const companiesData = await companiesResponse.json();
       if (!marketplaceResponse.ok || !companiesResponse.ok) throw new Error('Não foi possível carregar marketplaces.');
       setMarketplaces(Array.isArray(marketplaceData) ? marketplaceData : []);
-      const companyIds = marketplaceCompanyFilter ? [marketplaceCompanyFilter] : (Array.isArray(companiesData) ? companiesData.map((company: Company) => company.id) : []);
+      const companiesList: Company[] = Array.isArray(companiesData)
+  ? companiesData
+  : Array.isArray(companiesData?.data)
+    ? companiesData.data
+    : [];
+
+const companyIds = marketplaceCompanyFilter
+  ? [marketplaceCompanyFilter]
+  : companiesList.map((company) => company.id);
       const accountResponses = await Promise.all(companyIds.map((companyId) => fetch(`${API_URL}/companies/${companyId}/marketplaces`, { headers: { Authorization: `Bearer ${token}` } })));
       const accountData = await Promise.all(accountResponses.map((response) => response.json()));
       setMarketplaceAccounts(accountData.flatMap((accounts) => Array.isArray(accounts) ? accounts : []));
@@ -323,25 +333,37 @@ const [usersError, setUsersError] = useState('');
     await loadMarketplaces();
   }
 
-  function isLocationStale(device: Device) {
-    const lastLocationAt = device.currentStatus?.lastLocationAt;
-    return !lastLocationAt || Date.now() - new Date(lastLocationAt).getTime() > 30 * 60 * 1000;
-  }
+function isLocationStale(device: Device) {
+  const lastLocationAt = device.currentStatus?.lastLocationAt;
+
+  if (!lastLocationAt) return true;
+
+  const lastLocationTime = new Date(lastLocationAt).getTime();
+  const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+
+  return lastLocationTime < thirtyMinutesAgo;
+}
 
   function openDeviceLocation(device: Device) {
-    const latitude = device.currentStatus?.lastLatitude;
-    const longitude = device.currentStatus?.lastLongitude;
+  const latitude = device.currentStatus?.lastLatitude;
+  const longitude = device.currentStatus?.lastLongitude;
 
-    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
-      return;
-    }
-
-    window.open(
-      `https://www.google.com/maps?q=${latitude},${longitude}`,
-      '_blank',
-      'noopener,noreferrer',
-    );
+  if (
+    latitude === null ||
+    latitude === undefined ||
+    longitude === null ||
+    longitude === undefined
+  ) {
+    window.alert('Este aparelho ainda não enviou nenhuma localização.');
+    return;
   }
+
+  window.open(
+    `https://www.google.com/maps?q=${latitude},${longitude}`,
+    '_blank',
+    'noopener,noreferrer',
+  );
+}
 
   async function loadSms() {
     const token = localStorage.getItem('accessToken');
@@ -916,6 +938,139 @@ if (!companyNumber || !companyName) {
       err instanceof Error
         ? err.message
         : 'Erro ao importar as empresas.',
+    );
+  } finally {
+    setAiImportLoading(false);
+  }
+}
+
+async function confirmAiMarketplaceImport() {
+  if (
+    !aiImportPreview ||
+    !Array.isArray(aiImportPreview.companies) ||
+    aiImportPreview.companies.length === 0
+  ) {
+    setAiImportError('Nenhuma empresa encontrada para importar marketplaces.');
+    return;
+  }
+
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setAiImportLoading(true);
+  setAiImportError('');
+
+  let created = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  try {
+    const marketplaceResponse = await fetch(`${API_URL}/marketplaces`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const marketplaceData = await marketplaceResponse.json();
+
+    if (!marketplaceResponse.ok) {
+      throw new Error(
+        marketplaceData.message || 'Não foi possível carregar os marketplaces.',
+      );
+    }
+
+    const availableMarketplaces: Marketplace[] = Array.isArray(marketplaceData)
+      ? marketplaceData
+      : [];
+
+    for (const company of aiImportPreview.companies) {
+      const companyNumber = String(company.number || '').trim();
+
+      const existingCompany = dashboardCompanies.find(
+        (item) => item.document === `INT-${companyNumber}`,
+      );
+
+      if (!existingCompany) {
+        failed++;
+        continue;
+      }
+
+      const accountResponse = await fetch(
+        `${API_URL}/companies/${existingCompany.id}/marketplaces`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const existingAccounts = await accountResponse.json();
+
+      if (!accountResponse.ok) {
+        failed++;
+        continue;
+      }
+
+      for (const marketplaceName of company.marketplaces || []) {
+        const marketplace = availableMarketplaces.find(
+          (item) => item.name === marketplaceName,
+        );
+
+        // Ex.: Temu ainda não está cadastrado na plataforma.
+        if (!marketplace) {
+          skipped++;
+          continue;
+        }
+
+        const alreadyExists = Array.isArray(existingAccounts)
+          ? existingAccounts.some(
+              (account) => account.marketplaceId === marketplace.id,
+            )
+          : false;
+
+        if (alreadyExists) {
+          skipped++;
+          continue;
+        }
+
+        const createResponse = await fetch(
+          `${API_URL}/companies/${existingCompany.id}/marketplaces`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              marketplaceId: marketplace.id,
+              status: 'ACTIVE',
+              notes: 'Importado automaticamente da planilha',
+            }),
+          },
+        );
+
+        if (createResponse.ok) {
+          created++;
+        } else {
+          failed++;
+        }
+      }
+    }
+
+    await loadMarketplaces();
+
+    alert(
+      `Marketplaces importados: ${created} vínculos criados, ${skipped} ignorados e ${failed} com erro.`,
+    );
+  } catch (err) {
+    setAiImportError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao importar os marketplaces.',
     );
   } finally {
     setAiImportLoading(false);
@@ -2098,7 +2253,11 @@ useEffect(() => {
           {marketplaceError && <section className="welcome-card"><div className="error-message">{marketplaceError}</div></section>}
           {!marketplaceLoading && !marketplaceError && Array.from(new Set(filteredAccounts.map((account) => account.companyId))).map((companyId) => {
             const companyAccounts = filteredAccounts.filter((account) => account.companyId === companyId);
-            return <section className="welcome-card marketplace-company-card" key={companyId}><h3>{companyAccounts[0]?.company.name}</h3><div className="marketplace-grid">{marketplaces.map((marketplace) => { const account = companyAccounts.find((item) => item.marketplaceId === marketplace.id); return <div className="marketplace-cell" key={marketplace.id}><strong>{marketplace.name}</strong><span className={`marketplace-status marketplace-${(account?.status || 'INACTIVE').toLowerCase()}`}>{account?.status || 'INACTIVE'}</span>{account && <select value={account.status} onChange={(event) => updateMarketplaceAccount(account, event.target.value as MarketplaceAccount['status'])}>{marketplaceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select>}</div>; })}</div></section>;
+            return <section className="welcome-card marketplace-company-card" key={companyId}><h3>{companyAccounts[0]?.company.name}</h3><div className="marketplace-grid">{(
+  marketplaceFilter
+    ? marketplaces.filter((marketplace) => marketplace.id === marketplaceFilter)
+    : marketplaces
+).map((marketplace) => { const account = companyAccounts.find((item) => item.marketplaceId === marketplace.id); return <div className="marketplace-cell" key={marketplace.id}><strong>{marketplace.name}</strong><span className={`marketplace-status marketplace-${(account?.status || 'INACTIVE').toLowerCase()}`}>{account?.status || 'INACTIVE'}</span>{account && <select value={account.status} onChange={(event) => updateMarketplaceAccount(account, event.target.value as MarketplaceAccount['status'])}>{marketplaceStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select>}</div>; })}</div></section>;
           })}
         </main>
       </div>
@@ -2402,8 +2561,7 @@ useEffect(() => {
                       <button
                         className="new-company-button"
                         onClick={() => openDeviceLocation(device)}
-                        disabled={isLocationStale(device) || device.currentStatus?.lastLatitude === null || device.currentStatus?.lastLatitude === undefined || device.currentStatus?.lastLongitude === null || device.currentStatus?.lastLongitude === undefined}
-                      >
+                        >
                         Ver localização
                       </button>
                       <button
@@ -3185,6 +3343,14 @@ if (showAiImport) {
       >
         Confirmar importação das {aiImportPreview.totalCompanies} empresas
       </button>
+      <button
+  type="button"
+  className="new-company-button"
+  onClick={confirmAiMarketplaceImport}
+  style={{ marginLeft: '10px' }}
+>
+  Importar marketplaces da planilha
+</button>
     </div>
   )}
 
