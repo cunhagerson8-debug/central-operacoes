@@ -37,6 +37,21 @@ export class PaymentsService {
 }
 
 async createPayment(dto: CreatePaymentDto) {
+
+const existingPayment = await this.prisma.payment.findFirst({
+  where: {
+    beneficiaryId: dto.beneficiaryId,
+    referenceMonth: dto.referenceMonth,
+    referenceYear: dto.referenceYear,
+    description: dto.description?.trim(),
+    amount: dto.amount,
+  },
+});
+
+if (existingPayment) {
+  return existingPayment;
+}
+
   return this.prisma.payment.create({
     data: {
       beneficiaryId: dto.beneficiaryId,

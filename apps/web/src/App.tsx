@@ -874,7 +874,7 @@ setAiImportPreview({
 
   totalCompanies: companiesPreview.length,
   companies: companiesPreview,
-});
+  });
 
 return;
     }
@@ -1032,6 +1032,125 @@ if (!companyNumber || !companyName) {
       err instanceof Error
         ? err.message
         : 'Erro ao importar as empresas.',
+    );
+  } finally {
+    setAiImportLoading(false);
+  }
+}
+
+async function confirmAiPaymentImport() {
+  if (
+    !aiImportPreview ||
+    !Array.isArray(aiImportPreview.payments) ||
+    aiImportPreview.payments.length === 0
+  ) {
+    setAiImportError('Nenhum pagamento encontrado na planilha.');
+    return;
+  }
+
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setAiImportLoading(true);
+  setAiImportError('');
+
+  const beneficiariesResponse = await fetch(
+  `${API_URL}/payments/beneficiaries`,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  },
+);
+
+const beneficiariesData = await beneficiariesResponse.json();
+
+if (!beneficiariesResponse.ok) {
+  throw new Error(
+    beneficiariesData.message || 'Não foi possível carregar os beneficiários.',
+  );
+}
+
+const beneficiariesForImport = Array.isArray(beneficiariesData)
+  ? beneficiariesData
+  : [];
+
+setPaymentBeneficiaries(beneficiariesForImport);
+
+  let imported = 0;
+  let failed = 0;
+
+  try {
+    for (const payment of aiImportPreview.payments) {
+      try {
+        const beneficiary = beneficiariesForImport.find((item) =>
+          String(item.name || '')
+            .trim()
+            .toLowerCase()
+            .includes(String(payment.group || '').trim().toLowerCase())
+        );
+
+        if (!beneficiary) {
+          console.error(
+            'Beneficiário não encontrado para pagamento:',
+            payment.group,
+            payment
+          );
+          failed++;
+          continue;
+        }
+
+        const now = new Date();
+
+        const response = await fetch(`${API_URL}/payments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            beneficiaryId: beneficiary.id,
+            category: 'OTHER',
+            description: String(payment.product || '').trim() || undefined,
+            payer: String(payment.group || '').trim() || undefined,
+            client: String(payment.client || '').trim() || undefined,
+            amount: Number(payment.amount || 0),
+            dueDay: payment.dueDay || undefined,
+            referenceMonth: now.getMonth() + 1,
+            referenceYear: now.getFullYear(),
+            status: 'PENDING',
+            notes: String(payment.months || '').trim() || undefined,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          console.error('Erro ao importar pagamento:', payment, errorData);
+          failed++;
+          continue;
+        }
+
+        imported++;
+      } catch (paymentError) {
+        console.error('Erro durante importação do pagamento:', paymentError);
+        failed++;
+      }
+    }
+
+    await loadPayments();
+
+    alert(
+      `Importação de pagamentos concluída: ${imported} importados e ${failed} com erro.`
+    );
+  } catch (err) {
+    setAiImportError(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao importar os pagamentos.'
     );
   } finally {
     setAiImportLoading(false);
@@ -3446,6 +3565,16 @@ if (showAiImport) {
 >
   Importar marketplaces da planilha
 </button>
+
+<button
+  type="button"
+  className="new-company-button"
+  onClick={confirmAiPaymentImport}
+  style={{ marginLeft: '10px' }}
+>
+  Importar pagamentos da planilha
+</button>
+
     </div>
   )}
 
