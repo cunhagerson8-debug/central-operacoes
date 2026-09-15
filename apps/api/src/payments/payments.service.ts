@@ -90,4 +90,10 @@ async findAllPayments() {
   });
 }
 
+async deletePayment(id: string) {
+  return this.prisma.payment.delete({
+    where: { id },
+  });
+}
+
 }

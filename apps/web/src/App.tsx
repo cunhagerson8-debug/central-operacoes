@@ -725,6 +725,49 @@ async function deletePaymentBeneficiary(id: string, name: string) {
     );
   }
 }
+
+async function deletePayment(payment: any) {
+  const confirmed = window.confirm(
+    `Deseja realmente excluir este pagamento?\n\n` +
+    `Beneficiário: ${payment.beneficiary?.name || 'Não informado'}\n` +
+    `Descrição: ${payment.description || 'Não informada'}\n` +
+    `Valor: R$ ${Number(payment.amount || 0).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+    })}`
+  );
+
+  if (!confirmed) return;
+
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/payments/${payment.id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'Não foi possível excluir o pagamento.');
+    }
+
+    await loadPayments();
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao excluir o pagamento.'
+    );
+  }
+}
+
 async function analyzeAiImport() {
   if (!aiImportText.trim() && !aiImportFile) {
     setAiImportError('Cole os dados ou selecione uma planilha antes de analisar.');
@@ -760,6 +803,7 @@ async function analyzeAiImport() {
 
 
 const paymentSheet = workbook.Sheets['PAGAMENTOS'];
+let paymentPreview: any[] = [];
 
 if (paymentSheet) {
   const paymentRows = XLSX.utils.sheet_to_json<unknown[]>(paymentSheet, {
@@ -769,7 +813,7 @@ if (paymentSheet) {
 
   let currentGroup = '';
 
-  const paymentPreview = paymentRows
+  paymentPreview = paymentRows
   .map((row) => {
     const groupCell = String(row?.[0] ?? '').trim();
 
@@ -874,8 +918,9 @@ setAiImportPreview({
 
   totalCompanies: companiesPreview.length,
   companies: companiesPreview,
+  payments: paymentPreview,
   });
-
+  
 return;
     }
     // TEXTO COLADO MANUALMENTE
@@ -1087,23 +1132,44 @@ setPaymentBeneficiaries(beneficiariesForImport);
   try {
     for (const payment of aiImportPreview.payments) {
       try {
-        const beneficiary = beneficiariesForImport.find((item) =>
-          String(item.name || '')
-            .trim()
-            .toLowerCase()
-            .includes(String(payment.group || '').trim().toLowerCase())
-        );
 
-        if (!beneficiary) {
-          console.error(
-            'Beneficiário não encontrado para pagamento:',
-            payment.group,
-            payment
-          );
-          failed++;
-          continue;
-        }
+const payerName = String(payment.group || '').trim();
 
+let beneficiary = beneficiariesForImport.find(
+  (item) =>
+    String(item.name || '').trim().toLowerCase() ===
+    payerName.toLowerCase(),
+);
+
+if (!beneficiary) {
+  const beneficiaryResponse = await fetch(
+    `${API_URL}/payments/beneficiaries`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: payerName,
+        notes: 'Criado automaticamente pela importação de pagamentos',
+      }),
+    },
+  );
+
+  const beneficiaryData = await beneficiaryResponse.json();
+
+  if (!beneficiaryResponse.ok) {
+    throw new Error(
+      beneficiaryData.message || `Erro ao criar pagador ${payerName}`,
+    );
+  }
+
+  beneficiary = beneficiaryData;
+  beneficiariesForImport.push(beneficiary);
+}
+
+        
         const now = new Date();
 
         const response = await fetch(`${API_URL}/payments`, {
@@ -3903,6 +3969,23 @@ if (showPayments) {
         <div>
           Status: {payment.status}
         </div>
+
+<div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+  <button
+    type="button"
+    onClick={() => editPayment(payment)}
+  >
+    Editar
+  </button>
+
+  <button
+    type="button"
+    onClick={() => deletePayment(payment)}
+  >
+    Excluir
+  </button>
+</div>
+
       </div>
     ))}
   </div>

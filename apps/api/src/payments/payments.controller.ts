@@ -49,4 +49,10 @@ findAllPayments() {
   return this.paymentsService.findAllPayments();
 }
 
+@Delete(':id')
+@Permissions('payment.create')
+deletePayment(@Param('id') id: string) {
+  return this.paymentsService.deletePayment(id);
+}
+
 }
