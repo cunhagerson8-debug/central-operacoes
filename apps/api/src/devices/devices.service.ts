@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateDeviceToken, hashDeviceToken } from './device-token.util';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { CreateSmsDto } from './dto/create-sms.dto';
 import { HeartbeatDto } from './dto/heartbeat.dto';
@@ -189,6 +190,32 @@ export class DevicesService {
     });
 
     return presentDevice(device);
+  }
+
+  // Gera/rotaciona a credencial do aparelho; o token bruto só existe nesta resposta.
+  async provisionCredential(id: string) {
+    await this.findOne(id);
+
+    const token = generateDeviceToken();
+    const deviceApiKeyHash = hashDeviceToken(token);
+
+    await this.prisma.device.update({
+      where: { id },
+      data: { deviceApiKeyHash },
+    });
+
+    return { deviceId: id, token };
+  }
+
+  async revokeCredential(id: string) {
+    await this.findOne(id);
+
+    await this.prisma.device.update({
+      where: { id },
+      data: { deviceApiKeyHash: null },
+    });
+
+    return { deviceId: id, revoked: true };
   }
 
   async heartbeat(id: string, dto: HeartbeatDto) {
