@@ -726,6 +726,72 @@ async function deletePaymentBeneficiary(id: string, name: string) {
   }
 }
 
+async function editPayment(payment: any) {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  const description = window.prompt(
+    'Descrição do pagamento:',
+    payment.description || '',
+  );
+  if (description === null) return;
+
+  const amountText = window.prompt(
+    'Valor do pagamento:',
+    String(payment.amount || ''),
+  );
+  if (amountText === null) return;
+
+  const dueDayText = window.prompt(
+    'Dia do vencimento:',
+    String(payment.dueDay || ''),
+  );
+  if (dueDayText === null) return;
+
+  const amount = Number(
+    amountText.replace(/\./g, '').replace(',', '.'),
+  );
+
+  const dueDay = dueDayText.trim()
+    ? Number(dueDayText)
+    : undefined;
+
+  try {
+    const response = await fetch(`${API_URL}/payments/${payment.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        description: description.trim(),
+        amount,
+        dueDay,
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(
+        data?.message || 'Não foi possível editar o pagamento.',
+      );
+    }
+
+    await loadPayments();
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao editar o pagamento.',
+    );
+  }
+}
+
+
 async function deletePayment(payment: any) {
   const confirmed = window.confirm(
     `Deseja realmente excluir este pagamento?\n\n` +
