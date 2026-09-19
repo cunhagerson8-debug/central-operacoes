@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import * as XLSX from 'xlsx';
+import QRCode from 'qrcode';
 import './App.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -161,6 +162,13 @@ const [newUserError, setNewUserError] = useState('');
   const [showNewCompany, setShowNewCompany] = useState(false);
   const [holders, setHolders] = useState<Holder[]>([]);
   const [holdersLoading, setHoldersLoading] = useState(false);
+  const [showHolderForm, setShowHolderForm] = useState(false);
+const [holderFormLoading, setHolderFormLoading] = useState(false);
+const [holderFormError, setHolderFormError] = useState('');
+const [holderFullName, setHolderFullName] = useState('');
+const [holderCpf, setHolderCpf] = useState('');
+const [holderPhone, setHolderPhone] = useState('');
+const [holderEmail, setHolderEmail] = useState('');
   const [companyFormLoading, setCompanyFormLoading] = useState(false);
   const [companyFormError, setCompanyFormError] = useState('');
   const [companiesSuccess, setCompaniesSuccess] = useState('');
@@ -1555,6 +1563,62 @@ async function confirmAiMarketplaceImport() {
     }
   }
 
+async function handleCreateHolder(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  setHolderFormLoading(true);
+  setHolderFormError('');
+
+  try {
+    const response = await fetch(`${API_URL}/holders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        fullName: holderFullName.trim(),
+        cpf: holderCpf.trim(),
+        phone: holderPhone.trim() || undefined,
+        email: holderEmail.trim() || undefined,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message = Array.isArray(data.message)
+        ? data.message.join(' ')
+        : data.message;
+
+      throw new Error(message || 'Não foi possível cadastrar o titular.');
+    }
+
+    setHolderFullName('');
+    setHolderCpf('');
+    setHolderPhone('');
+    setHolderEmail('');
+    setShowHolderForm(false);
+
+    await loadHolders();
+
+    window.alert('Titular cadastrado com sucesso!');
+  } catch (err) {
+    setHolderFormError(
+      err instanceof Error ? err.message : 'Erro ao cadastrar titular.',
+    );
+  } finally {
+    setHolderFormLoading(false);
+  }
+}
+
   async function loadDrivers() {
     const token = localStorage.getItem('accessToken');
 
@@ -1823,6 +1887,63 @@ async function loadDashboardDevices() {
     setShowDeviceForm(true);
   }
 
+  async function activateDeviceAgent(device: Device) {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/devices/${device.id}/credential`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const credential = await response.json();
+
+    const qrData = JSON.stringify({
+  type: 'MIL_AGENT_ACTIVATION',
+  deviceId: credential.deviceId,
+  token: credential.token,
+});
+
+const qrCode = await QRCode.toDataURL(qrData);
+
+const qrWindow = window.open('', '_blank');
+
+if (qrWindow) {
+  qrWindow.document.write(`
+    <html>
+      <head>
+        <title>Ativação MIL Agent</title>
+      </head>
+      <body style="font-family:Arial;text-align:center;padding:30px;">
+        <h2>MIL Operações</h2>
+        <h3>Ativação do Aparelho</h3>
+        <p>Escaneie este QR Code no MIL Agent</p>
+        <img src="${qrCode}" width="320" height="320" />
+        <p>Este QR contém a credencial de ativação do aparelho.</p>
+      </body>
+    </html>
+  `);
+
+  qrWindow.document.close();
+}
+  } catch (err) {
+    window.alert(
+      `Erro ao ativar Agent: ${err instanceof Error ? err.message : 'Erro desconhecido'}`
+    );
+  }
+}
+
   async function handleSaveDevice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDeviceFormError('');
@@ -2056,7 +2177,7 @@ if (!hasValidDevice) {
         throw new Error(data.message || 'Não foi possível cadastrar a empresa.');
       }
 
-      const newCompanyId = data.id;
+      const newCompanyId = editingCompanyId || data.id;
 
 if (!newCompanyId) {
   throw new Error('A empresa foi criada, mas o sistema não retornou o ID.');
@@ -2919,6 +3040,14 @@ useEffect(() => {
                       >
                         Ver SMS
                       </button>
+
+<button
+  className="new-company-button"
+  onClick={() => activateDeviceAgent(device)}
+>
+  Ativar Agent
+</button>
+
                       <button className="new-company-button" onClick={() => editDevice(device)}>Editar</button>
                     </div>
                   </div>
@@ -2928,6 +3057,7 @@ useEffect(() => {
   <span>
     Total: {devicesTotal} aparelhos
   </span>
+
 
   <div>
     <button
@@ -3268,6 +3398,80 @@ if (showHolders) {
             </div>
           </div>
         </section>
+
+        <section className="welcome-card">
+  <button
+    type="button"
+    className="new-company-button"
+    onClick={() => {
+      setHolderFormError('');
+      setShowHolderForm(!showHolderForm);
+    }}
+  >
+    {showHolderForm ? 'Cancelar' : '+ Novo Titular'}
+  </button>
+
+  {showHolderForm && (
+    <form onSubmit={handleCreateHolder} style={{ marginTop: '20px' }}>
+      <div className="form-grid">
+        <div>
+          <label htmlFor="holder-full-name">Nome completo *</label>
+          <input
+            id="holder-full-name"
+            type="text"
+            value={holderFullName}
+            onChange={(event) => setHolderFullName(event.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="holder-cpf">CPF *</label>
+          <input
+            id="holder-cpf"
+            type="text"
+            value={holderCpf}
+            onChange={(event) => setHolderCpf(event.target.value)}
+            required
+          />
+        </div>
+
+        <div>
+          <label htmlFor="holder-phone">Telefone</label>
+          <input
+            id="holder-phone"
+            type="tel"
+            value={holderPhone}
+            onChange={(event) => setHolderPhone(event.target.value)}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="holder-email">E-mail</label>
+          <input
+            id="holder-email"
+            type="email"
+            value={holderEmail}
+            onChange={(event) => setHolderEmail(event.target.value)}
+          />
+        </div>
+      </div>
+
+      {holderFormError && (
+        <p className="form-error">{holderFormError}</p>
+      )}
+
+      <button
+        type="submit"
+        className="new-company-button"
+        disabled={holderFormLoading}
+        style={{ marginTop: '16px' }}
+      >
+        {holderFormLoading ? 'Cadastrando...' : 'Cadastrar Titular'}
+      </button>
+    </form>
+  )}
+</section>
 
         {holdersLoading && (
           <section className="welcome-card">

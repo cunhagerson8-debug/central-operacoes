@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateDeviceToken, hashDeviceToken } from './device-token.util';
 import { CreateDeviceDto } from './dto/create-device.dto';
@@ -151,6 +155,22 @@ export class DevicesService {
   }
 
   async create(dto: CreateDeviceDto) {
+
+const duplicateDevice = await this.prisma.device.findFirst({
+  where: {
+    OR: [
+      ...(dto.imei ? [{ imei: dto.imei.trim() }] : []),
+      ...(dto.phoneNumber ? [{ phoneNumber: dto.phoneNumber.trim() }] : []),
+    ],
+  },
+});
+
+if (duplicateDevice) {
+  throw new ConflictException(
+    'Este aparelho já está cadastrado. Verifique o IMEI ou o número do celular.',
+  );
+}
+
     return this.prisma.device.create({
       data: {
         companyId: dto.companyId,
