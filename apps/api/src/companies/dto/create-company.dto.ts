@@ -73,6 +73,25 @@ city?: string;
 @Length(2, 2)
 state?: string;
 
+@IsOptional()
+capitalSocial?: number;
+
+@IsOptional()
+@IsString()
+taxRegime?: string;
+
+@IsOptional()
+@IsString()
+companySize?: string;
+
+@IsOptional()
+@IsString()
+cnae?: string;
+
+@IsOptional()
+@IsString()
+businessActivity?: string;
+
   @IsOptional()
   @IsString()
   notes?: string;

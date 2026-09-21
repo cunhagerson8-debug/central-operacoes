@@ -79,4 +79,24 @@ state?: string;
   @IsOptional()
   @IsString()
   notes?: string;
+
+@IsOptional()
+capitalSocial?: number;
+
+@IsOptional()
+@IsString()
+taxRegime?: string;
+
+@IsOptional()
+@IsString()
+companySize?: string;
+
+@IsOptional()
+@IsString()
+cnae?: string;
+
+@IsOptional()
+@IsString()
+businessActivity?: string;
+
 }

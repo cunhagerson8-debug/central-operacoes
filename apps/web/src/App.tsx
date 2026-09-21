@@ -16,6 +16,11 @@ type Company = {
   holderId?: string;
   phone?: string;
   email?: string;
+  capitalSocial?: number | string;
+taxRegime?: string;
+companySize?: string;
+cnae?: string;
+businessActivity?: string;
 };
 
 type Holder = {
@@ -173,6 +178,11 @@ const [holderEmail, setHolderEmail] = useState('');
   const [companyFormError, setCompanyFormError] = useState('');
   const [companiesSuccess, setCompaniesSuccess] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [companyCapitalSocial, setCompanyCapitalSocial] = useState('');
+const [companyTaxRegime, setCompanyTaxRegime] = useState('');
+const [companySize, setCompanySize] = useState('');
+const [companyCnae, setCompanyCnae] = useState('');
+const [companyBusinessActivity, setCompanyBusinessActivity] = useState('');
   const [companyLegalName, setCompanyLegalName] = useState('');
   const [companyDocument, setCompanyDocument] = useState('');
   const [companyDocumentType, setCompanyDocumentType] = useState('CNPJ');
@@ -1885,6 +1895,13 @@ async function loadDashboardDevices() {
     setDeviceNotes(device.notes || '');
     setDeviceFormError('');
     setShowDeviceForm(true);
+    
+    setTimeout(() => {
+  document.getElementById('device-company')?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  });
+}, 100);
   }
 
   async function activateDeviceAgent(device: Device) {
@@ -2077,9 +2094,18 @@ if (qrWindow) {
   function resetCompanyForm() {
     setCompanyName('');
     setCompanyLegalName('');
+    setCompanyCapitalSocial('');
+setCompanyTaxRegime('');
+setCompanySize('');
+setCompanyCnae('');
+setCompanyBusinessActivity('');
     setCompanyDocument('');
     setCompanyDocumentType('CNPJ');
     setCompanyHolderId('');
+    setHolderFullName('');
+setHolderCpf('');
+setHolderPhone('');
+setHolderEmail('');
     setCompanyPhone('');
     setCompanyEmail('');
     setCompanyNotes('');
@@ -2097,6 +2123,11 @@ function editCompany(company: Company) {
   setCompanyEmail(company.email || '');
   setCompanyNotes(company.notes || '');
   setCompanyFormError('');
+  setCompanyCapitalSocial(company.capitalSocial?.toString() || '');
+setCompanyTaxRegime(company.taxRegime || '');
+setCompanySize(company.companySize || '');
+setCompanyCnae(company.cnae || '');
+setCompanyBusinessActivity(company.businessActivity || '');
   setShowNewCompany(true);
 }
 
@@ -2132,6 +2163,43 @@ if (!hasValidDevice) {
     setCompanyFormLoading(true);
 
     try {
+
+let holderId = companyHolderId;
+
+if (!editingCompanyId) {
+  if (!holderFullName.trim() || !holderCpf.trim()) {
+    throw new Error('Preencha o nome e o CPF do titular.');
+  }
+
+  const holderResponse = await fetch(`${API_URL}/holders`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      fullName: holderFullName.trim(),
+      cpf: holderCpf.trim(),
+      phone: holderPhone.trim() || undefined,
+      email: holderEmail.trim() || undefined,
+    }),
+  });
+
+  const holderData = await holderResponse.json();
+
+  if (!holderResponse.ok) {
+    const message = Array.isArray(holderData.message)
+      ? holderData.message.join(' ')
+      : holderData.message;
+
+    throw new Error(
+      message || 'Não foi possível cadastrar o titular.',
+    );
+  }
+
+  holderId = holderData.id;
+}
+
       const response = await fetch(
   editingCompanyId
     ? `${API_URL}/companies/${editingCompanyId}`
@@ -2147,9 +2215,14 @@ if (!hasValidDevice) {
           legalName: companyLegalName.trim() || undefined,
           document: companyDocument.trim(),
           documentType: companyDocumentType,
-          holderId: companyHolderId,
+          holderId: holderId,
           phone: companyPhone.trim() || undefined,
-          email: companyEmail.trim() || undefined,
+          email: holderEmail.trim() || undefined,
+          capitalSocial: companyCapitalSocial ? Number(companyCapitalSocial) : undefined,
+taxRegime: companyTaxRegime || undefined,
+companySize: companySize || undefined,
+cnae: companyCnae.trim() || undefined,
+businessActivity: companyBusinessActivity.trim() || undefined,
           notes: companyNotes.trim() || undefined,
         }),
       });
@@ -2264,6 +2337,12 @@ setShowNewCompany(false);
       loadHolders();
     }
   }, [showNewCompany]);
+
+  useEffect(() => {
+  if (showHolders) {
+    loadHolders();
+  }
+}, [showHolders]);
 
   useEffect(() => {
     if (showDrivers) {
@@ -2408,6 +2487,7 @@ useEffect(() => {
 
           <section className="welcome-card">
             <form onSubmit={handleCreateCompany}>
+              <h3>🏢 Pessoa Jurídica</h3>
               <label htmlFor="company-name">Nome da empresa *</label>
               <input
                 id="company-name"
@@ -2424,6 +2504,62 @@ useEffect(() => {
                 value={companyLegalName}
                 onChange={(event) => setCompanyLegalName(event.target.value)}
               />
+
+              <label htmlFor="company-capital-social">Capital Social</label>
+<input
+  id="company-capital-social"
+  type="number"
+  step="0.01"
+  min="0"
+  value={companyCapitalSocial}
+  onChange={(event) => setCompanyCapitalSocial(event.target.value)}
+  placeholder="Ex.: 500000,00"
+/>
+
+<label htmlFor="company-tax-regime">Regime Tributário</label>
+<select
+  id="company-tax-regime"
+  value={companyTaxRegime}
+  onChange={(event) => setCompanyTaxRegime(event.target.value)}
+>
+  <option value="">Selecione</option>
+  <option value="Simples Nacional">Simples Nacional</option>
+  <option value="Lucro Presumido">Lucro Presumido</option>
+  <option value="Lucro Real">Lucro Real</option>
+  <option value="MEI">MEI</option>
+</select>
+
+<label htmlFor="company-size">Porte da Empresa</label>
+<select
+  id="company-size"
+  value={companySize}
+  onChange={(event) => setCompanySize(event.target.value)}
+>
+  <option value="">Selecione</option>
+  <option value="MEI">MEI</option>
+  <option value="ME">Microempresa (ME)</option>
+  <option value="EPP">Empresa de Pequeno Porte (EPP)</option>
+  <option value="MEDIO">Médio Porte</option>
+  <option value="GRANDE">Grande Porte</option>
+</select>
+
+<label htmlFor="company-cnae">CNAE</label>
+<input
+  id="company-cnae"
+  type="text"
+  value={companyCnae}
+  onChange={(event) => setCompanyCnae(event.target.value)}
+  placeholder="Ex.: 47.89-0-99"
+/>
+
+<label htmlFor="company-business-activity">Atividade da Empresa</label>
+<input
+  id="company-business-activity"
+  type="text"
+  value={companyBusinessActivity}
+  onChange={(event) => setCompanyBusinessActivity(event.target.value)}
+  placeholder="Ex.: Comércio varejista de variedades"
+/>
 
               <label htmlFor="company-document">Documento *</label>
               <input
@@ -2445,25 +2581,33 @@ useEffect(() => {
                 <option value="CPF">CPF</option>
               </select>
 
-              <label htmlFor="company-holder">Titular *</label>
-              <select
-                id="company-holder"
-                value={companyHolderId}
-                onChange={(event) => setCompanyHolderId(event.target.value)}
-                disabled={holdersLoading}
-                required
-              >
-                <option value="">
-                  {holdersLoading
-                    ? 'Carregando titulares...'
-                    : 'Selecione um titular'}
-                </option>
-                {holders.map((holder) => (
-                  <option key={holder.id} value={holder.id}>
-                    {holder.fullName}{holder.cpf ? ` - ${holder.cpf}` : ''}
-                  </option>
-                ))}
-              </select>
+<h3>👤 Pessoa Física</h3>
+              <label htmlFor="company-holder-name">Nome do titular *</label>
+<input
+  id="company-holder-name"
+  type="text"
+  value={holderFullName}
+  onChange={(event) => setHolderFullName(event.target.value)}
+  required
+/>
+
+<label htmlFor="company-holder-cpf">CPF do titular *</label>
+<input
+  id="company-holder-cpf"
+  type="text"
+  value={holderCpf}
+  onChange={(event) => setHolderCpf(event.target.value)}
+  required
+/>
+
+
+<label htmlFor="company-holder-email">E-mail do titular</label>
+<input
+  id="company-holder-email"
+  type="email"
+  value={holderEmail}
+  onChange={(event) => setHolderEmail(event.target.value)}
+/>
 
               <label htmlFor="company-phone">Telefone</label>
               <input
@@ -2473,14 +2617,7 @@ useEffect(() => {
                 onChange={(event) => setCompanyPhone(event.target.value)}
               />
 
-              <label htmlFor="company-email">E-mail</label>
-              <input
-                id="company-email"
-                type="email"
-                value={companyEmail}
-                onChange={(event) => setCompanyEmail(event.target.value)}
-              />
-
+             
               <label htmlFor="company-notes">Observações</label>
               <textarea
                 id="company-notes"

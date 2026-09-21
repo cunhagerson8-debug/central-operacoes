@@ -106,8 +106,27 @@ model Holder {
   address   Json?
   createdAt DateTime  @default(now()) @map("created_at")
   companies Company[]
+  documents HolderDocument[]
 
   @@map("holders")
+}
+
+model HolderDocument {
+  id        String    @id @default(uuid()) @db.Uuid
+  holderId  String    @map("holder_id") @db.Uuid
+  category  String
+  name      String
+  fileUrl   String?   @map("file_url")
+  expiresAt DateTime? @map("expires_at")
+  status    String    @default("PENDING")
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  holder Holder @relation(fields: [holderId], references: [id], onDelete: Cascade)
+
+  @@index([holderId])
+  @@map("holder_documents")
 }
 
 model Company {
@@ -126,6 +145,13 @@ complement   String?
 neighborhood String?
 city         String?
 state        String?
+
+capitalSocial Decimal? @map("capital_social") @db.Decimal(15, 2)
+taxRegime String? @map("tax_regime")
+companySize String? @map("company_size")
+cnae String?
+businessActivity String? @map("business_activity")
+
   status              CompanyStatus               @default(PENDING)
   internalOwnerId     String?                     @map("internal_owner_id") @db.Uuid
   notes               String?

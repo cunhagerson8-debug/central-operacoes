@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHolderDto } from './dto/create-holder.dto';
+import { CreateHolderDocumentDto } from './dto/create-holder-document.dto';
+
 
 @Injectable()
 export class HoldersService {
@@ -35,4 +37,34 @@ export class HoldersService {
       },
     });
   }
+
+  async createDocument(holderId: string, dto: CreateHolderDocumentDto) {
+    await this.findOne(holderId);
+
+    return this.prisma.holderDocument.create({
+      data: {
+        holderId,
+        category: dto.category,
+        name: dto.name,
+        fileUrl: dto.fileUrl,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        status: dto.status || 'PENDING',
+        notes: dto.notes,
+      },
+    });
+  }
+
+async findDocuments(holderId: string) {
+  await this.findOne(holderId);
+
+  return this.prisma.holderDocument.findMany({
+    where: {
+      holderId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+}
+
 }

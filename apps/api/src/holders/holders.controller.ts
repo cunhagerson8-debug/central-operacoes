@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 
 import { CreateHolderDto } from './dto/create-holder.dto';
+import { CreateHolderDocumentDto } from './dto/create-holder-document.dto';
 import { HoldersService } from './holders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/permissions.guard';
@@ -37,4 +38,20 @@ export class HoldersController {
   async findOne(@Param('id') id: string) {
     return this.holdersService.findOne(id);
   }
+  
+  @Post(':id/documents')
+  @Permissions('holder.create')
+  async createDocument(
+    @Param('id') id: string,
+    @Body() dto: CreateHolderDocumentDto,
+  ) {
+    return this.holdersService.createDocument(id, dto);
+  }
+
+@Get(':id/documents')
+@Permissions('holder.view')
+async findDocuments(@Param('id') id: string) {
+  return this.holdersService.findDocuments(id);
+}
+
 }
