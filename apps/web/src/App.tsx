@@ -188,7 +188,7 @@ const [companyBusinessActivity, setCompanyBusinessActivity] = useState('');
   const [companyDocumentType, setCompanyDocumentType] = useState('CNPJ');
   const [companyHolderId, setCompanyHolderId] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
-  const [companyEmail, setCompanyEmail] = useState('');
+  
   const [companyNotes, setCompanyNotes] = useState('');
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [driversLoading, setDriversLoading] = useState(false);
@@ -2108,7 +2108,7 @@ setHolderCpf('');
 setHolderPhone('');
 setHolderEmail('');
     setCompanyPhone('');
-    setCompanyEmail('');
+    
     setCompanyNotes('');
     setCompanyFormError('');
   }
@@ -2121,7 +2121,7 @@ function editCompany(company: Company) {
   setCompanyDocumentType(company.documentType || 'CNPJ');
   setCompanyHolderId(company.holderId || '');
   setCompanyPhone(company.phone || '');
-  setCompanyEmail(company.email || '');
+  
   setCompanyNotes(company.notes || '');
   setCompanyFormError('');
   setCompanyCapitalSocial(company.capitalSocial?.toString() || '');
