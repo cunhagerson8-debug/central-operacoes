@@ -2341,7 +2341,7 @@ setShowNewCompany(false);
 
   useEffect(() => {
   if (showHolders) {
-    console.log('ENTROU NO TITULARES - showHolders:', showHolders);
+    alert('ENTROU NO TITULARES');
     loadHolders();
   }
 }, [showHolders]);
