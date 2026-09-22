@@ -1561,6 +1561,7 @@ async function confirmAiMarketplaceImport() {
         );
       }
 
+      console.log('DADOS DOS TITULARES:', data);
       setHolders(Array.isArray(data) ? data : []);
     } catch (err) {
       setCompanyFormError(
