@@ -1561,7 +1561,7 @@ async function confirmAiMarketplaceImport() {
         );
       }
 
-      console.log('DADOS DOS TITULARES:', data);
+      
       setHolders(Array.isArray(data) ? data : []);
     } catch (err) {
       setCompanyFormError(
@@ -2341,7 +2341,7 @@ setShowNewCompany(false);
 
   useEffect(() => {
   if (showHolders) {
-    alert('ENTROU NO TITULARES');
+  
     loadHolders();
   }
 }, [showHolders]);
