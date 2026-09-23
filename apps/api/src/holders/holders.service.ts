@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateHolderDto } from './dto/create-holder.dto';
 import { CreateHolderDocumentDto } from './dto/create-holder-document.dto';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 
 @Injectable()
@@ -94,6 +94,44 @@ async findDocuments(holderId: string) {
       createdAt: 'desc',
     },
   });
+}
+
+async getDocumentDownloadUrl(holderId: string, documentId: string) {
+  await this.findOne(holderId);
+
+  const document = await this.prisma.holderDocument.findFirst({
+    where: {
+      id: documentId,
+      holderId,
+    },
+  });
+
+  if (!document) {
+    throw new NotFoundException('Documento não encontrado.');
+  }
+
+  if (!document.fileUrl) {
+    throw new NotFoundException('Arquivo não encontrado.');
+  }
+
+  const result = await this.s3.send(
+    new GetObjectCommand({
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Key: document.fileUrl,
+    }),
+  );
+
+  if (!result.Body) {
+    throw new NotFoundException('Arquivo não encontrado.');
+  }
+
+  const bytes = await result.Body.transformToByteArray();
+
+  return {
+    name: document.name,
+    contentType: result.ContentType || 'application/octet-stream',
+    data: Buffer.from(bytes).toString('base64'),
+  };
 }
 
 }

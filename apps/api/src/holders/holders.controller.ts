@@ -59,4 +59,13 @@ async findDocuments(@Param('id') id: string) {
   return this.holdersService.findDocuments(id);
 }
 
+@Get(':id/documents/:documentId/download')
+@Permissions('holder.view')
+async downloadDocument(
+  @Param('id') id: string,
+  @Param('documentId') documentId: string,
+) {
+  return this.holdersService.getDocumentDownloadUrl(id, documentId);
+}
+
 }

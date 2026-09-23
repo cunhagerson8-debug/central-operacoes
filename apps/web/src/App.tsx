@@ -170,6 +170,7 @@ const [newUserError, setNewUserError] = useState('');
   const [holders, setHolders] = useState<Holder[]>([]);
   const [holderSearch, setHolderSearch] = useState('');
   const [selectedHolder, setSelectedHolder] = useState<Holder | null>(null);
+  const [holderDocuments, setHolderDocuments] = useState<any[]>([]);
   const [holdersLoading, setHoldersLoading] = useState(false);
   const [showHolderForm, setShowHolderForm] = useState(false);
 const [holderFormLoading, setHolderFormLoading] = useState(false);
@@ -1578,6 +1579,36 @@ async function confirmAiMarketplaceImport() {
     }
   }
 
+  async function loadHolderDocuments(holderId: string) {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) return;
+
+  try {
+    const response = await fetch(
+      `${API_URL}/holders/${holderId}/documents`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || 'Não foi possível carregar os documentos.',
+      );
+    }
+
+    setHolderDocuments(Array.isArray(data) ? data : []);
+  } catch (err) {
+    console.error('Erro ao carregar documentos do titular:', err);
+    setHolderDocuments([]);
+  }
+}
+
 async function uploadHolderDocument(
   holderId: string,
   file: File,
@@ -1620,6 +1651,51 @@ async function uploadHolderDocument(
   }
 }
 
+async function downloadHolderDocument(
+  holderId: string,
+  documentId: string,
+) {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/holders/${holderId}/documents/${documentId}/download`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error('Não foi possível baixar o arquivo.');
+    }
+
+    const data = await response.json();
+
+    if (!data.data) {
+      throw new Error('Arquivo não encontrado.');
+    }
+
+    const link = document.createElement('a');
+    link.href = `data:${data.contentType};base64,${data.data}`;
+    link.download = data.name || 'arquivo';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao baixar arquivo.',
+    );
+  }
+}
 
 async function handleCreateHolder(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
@@ -3706,6 +3782,30 @@ if (showHolders) {
   </label>
 </p>
 
+{holderDocuments.length > 0 && (
+  <div>
+    <h4>Arquivos anexados</h4>
+
+    {holderDocuments.map((doc) => (
+      <p key={doc.id}>
+        📎 <button
+  type="button"
+  onClick={() => downloadHolderDocument(selectedHolder.id, doc.id)}
+  style={{
+    border: 'none',
+    background: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    color: 'inherit',
+  }}
+>
+  📎 {doc.name}
+</button>
+      </p>
+    ))}
+  </div>
+)}
 
   </section>
 )}
@@ -3725,7 +3825,10 @@ if (showHolders) {
               <div
   className="company-row"
   key={holder.id}
-  onClick={() => setSelectedHolder(holder)}
+  onClick={() => {
+  setSelectedHolder(holder);
+  loadHolderDocuments(holder.id);
+}}
   style={{ cursor: 'pointer' }}
 >
                 <div>
