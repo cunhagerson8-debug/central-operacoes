@@ -3765,9 +3765,9 @@ if (showHolders) {
 
 <h3>Documentos e Selfie</h3>
 <p>
-  Selfie do titular:{' '}
+  📷 Foto / Selfie:{' '}
   <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-    Anexar arquivo
+    Anexar foto
     <input
   type="file"
   accept="image/*"
@@ -3779,6 +3779,60 @@ if (showHolders) {
     }
   }}
 />
+  </label>
+</p>
+
+<p>
+  🪪 Documento de identificação:{' '}
+  <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+    Anexar documento
+    <input
+      type="file"
+      accept="image/*,.pdf"
+      style={{ display: 'none' }}
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          uploadHolderDocument(selectedHolder.id, file, 'IDENTIFICATION');
+        }
+      }}
+    />
+  </label>
+</p>
+
+<p>
+  🏠 Comprovante de endereço:{' '}
+  <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+    Anexar comprovante
+    <input
+      type="file"
+      accept="image/*,.pdf"
+      style={{ display: 'none' }}
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          uploadHolderDocument(selectedHolder.id, file, 'ADDRESS_PROOF');
+        }
+      }}
+    />
+  </label>
+</p>
+
+<p>
+  📁 Outros documentos:{' '}
+  <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+    Anexar arquivo
+    <input
+      type="file"
+      accept="image/*,.pdf"
+      style={{ display: 'none' }}
+      onChange={(event) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          uploadHolderDocument(selectedHolder.id, file, 'OTHER');
+        }
+      }}
+    />
   </label>
 </p>
 
