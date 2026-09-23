@@ -4,9 +4,12 @@ import {
   Get,
   Param,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateHolderDto } from './dto/create-holder.dto';
 import { CreateHolderDocumentDto } from './dto/create-holder-document.dto';
 import { HoldersService } from './holders.service';
@@ -41,11 +44,13 @@ export class HoldersController {
   
   @Post(':id/documents')
   @Permissions('holder.create')
+  @UseInterceptors(FileInterceptor('file'))
   async createDocument(
     @Param('id') id: string,
+    @UploadedFile() file: any,
     @Body() dto: CreateHolderDocumentDto,
   ) {
-    return this.holdersService.createDocument(id, dto);
+    return this.holdersService.createDocument(id, dto, file);
   }
 
 @Get(':id/documents')

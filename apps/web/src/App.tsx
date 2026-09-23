@@ -27,6 +27,8 @@ type Holder = {
   id: string;
   fullName: string;
   cpf?: string;
+  phone?: string;
+email?: string;
 };
 
 type DriverCompany = {
@@ -166,6 +168,8 @@ const [newUserError, setNewUserError] = useState('');
   const [companiesError, setCompaniesError] = useState('');
   const [showNewCompany, setShowNewCompany] = useState(false);
   const [holders, setHolders] = useState<Holder[]>([]);
+  const [holderSearch, setHolderSearch] = useState('');
+  const [selectedHolder, setSelectedHolder] = useState<Holder | null>(null);
   const [holdersLoading, setHoldersLoading] = useState(false);
   const [showHolderForm, setShowHolderForm] = useState(false);
 const [holderFormLoading, setHolderFormLoading] = useState(false);
@@ -1573,6 +1577,49 @@ async function confirmAiMarketplaceImport() {
       setHoldersLoading(false);
     }
   }
+
+async function uploadHolderDocument(
+  holderId: string,
+  file: File,
+  category: string,
+) {
+  const token = localStorage.getItem('accessToken');
+
+  if (!token) {
+    setLoggedIn(false);
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('category', category);
+  formData.append('name', file.name);
+
+  try {
+    const response = await fetch(`${API_URL}/holders/${holderId}/documents`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Não foi possível anexar o arquivo.');
+    }
+
+    alert('Arquivo anexado com sucesso!');
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : 'Erro ao anexar arquivo.',
+    );
+  }
+}
+
 
 async function handleCreateHolder(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
@@ -3624,10 +3671,63 @@ if (showHolders) {
           </section>
         )}
 
+        <input
+  type="text"
+  placeholder="Buscar titular por nome ou CPF..."
+  value={holderSearch}
+  onChange={(event) => setHolderSearch(event.target.value)}
+/>
+
+{selectedHolder && (
+  <section className="welcome-card">
+    <h2>{selectedHolder.fullName}</h2>
+    <p>CPF: {selectedHolder.cpf || 'Não informado'}</p>
+    <p>E-mail: {selectedHolder.email || 'Não informado'}</p>
+    <p>Telefone: {selectedHolder.phone || 'Não informado'}</p>
+
+<hr />
+
+<h3>Documentos e Selfie</h3>
+<p>
+  Selfie do titular:{' '}
+  <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+    Anexar arquivo
+    <input
+  type="file"
+  accept="image/*"
+  style={{ display: 'none' }}
+  onChange={(event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      uploadHolderDocument(selectedHolder.id, file, 'SELFIE');
+    }
+  }}
+/>
+  </label>
+</p>
+
+
+  </section>
+)}
+
         {!holdersLoading && holders.length > 0 && (
           <section className="companies-list">
-            {holders.map((holder) => (
-              <div className="company-row" key={holder.id}>
+            {holders
+  .filter((holder) => {
+    const busca = holderSearch.toLowerCase().trim();
+
+    return (
+      holder.fullName?.toLowerCase().includes(busca) ||
+      holder.cpf?.includes(busca)
+    );
+  })
+  .map((holder) => (
+              <div
+  className="company-row"
+  key={holder.id}
+  onClick={() => setSelectedHolder(holder)}
+  style={{ cursor: 'pointer' }}
+>
                 <div>
                   <strong>{holder.fullName || 'Titular sem nome'}</strong>
                   <span>{holder.cpf || 'CPF não informado'}</span>
