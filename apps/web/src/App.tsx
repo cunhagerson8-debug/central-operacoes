@@ -244,6 +244,7 @@ function removeCompanyDevice(index: number) {
 }
   const [driverCompanyIds, setDriverCompanyIds] = useState<string[]>([]);
   type CompanyDeviceForm = {
+  id?: string;
   phoneNumber: string;
   imei: string;
   manufacturer: string;
@@ -267,6 +268,7 @@ const [companyDevices, setCompanyDevices] = useState<CompanyDeviceForm[]>([
     notes: '',
   },
 ]);
+
   const [devices, setDevices] = useState<Device[]>([]);
   const [dashboardDevices, setDashboardDevices] = useState<Device[]>([]);
   const [devicesPage, setDevicesPage] = useState(1);
@@ -3170,9 +3172,9 @@ useEffect(() => {
               <button
                 className="new-company-button"
                 onClick={() => {
-                  resetDeviceForm();
-                  setShowDeviceForm(true);
-                }}
+  resetDeviceForm();
+  setShowDeviceForm(true);
+}}
               >
                 + Novo Aparelho
               </button>
