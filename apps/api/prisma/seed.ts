@@ -146,8 +146,7 @@ async function main() {
     { name: 'TikTok Shop', code: 'TIKTOK_SHOP' },
     { name: 'Shopee', code: 'SHOPEE' },
     { name: 'Mercado Livre', code: 'MERCADO_LIVRE' },
-    { name: 'Amazon', code: 'AMAZON' },
-    { name: 'Magalu', code: 'MAGALU' },
+    { name: 'Temu', code: 'TEMU' },
   ];
 
   for (const marketplace of marketplaces) {

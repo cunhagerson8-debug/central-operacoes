@@ -1,0 +1,256 @@
+
+> web@0.0.0 lint
+> oxlint
+
+
+  ! react(purity): Cannot call impure function during render
+     ,-[src/App.tsx:370:28]
+ 369 |   const lastLocationTime = new Date(lastLocationAt).getTime();
+ 370 |   const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+     :                            ^^^^^|^^^^
+     :                                 `-- Cannot call impure function
+ 371 | 
+     `----
+  help: `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component re-renders
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/purity
+
+  ! react(purity): Cannot call impure function during render
+      ,-[src/App.tsx:4863:28]
+ 4862 |   const lastLocationTime = new Date(lastLocationAt).getTime();
+ 4863 |   const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+      :                            ^^^^^|^^^^
+      :                                 `-- Cannot call impure function
+ 4864 | 
+      `----
+  help: `Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component re-renders
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/purity
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2456:5]
+ 2453 | 
+ 2454 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2455 |   if (showPayments) {
+ 2456 |     loadPaymentBeneficiaries();
+      :     ^^^^^^^^^^^^|^^^^^^^^^^^
+      :                 `-- Avoid calling setState() directly within an effect
+ 2457 |     loadPayments();
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2463:7]
+ 2460 | 
+ 2461 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2462 |     if (showNewCompany) {
+ 2463 |       loadHolders();
+      :       ^^^^^|^^^^^
+      :            `-- Avoid calling setState() directly within an effect
+ 2464 |     }
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2470:5]
+ 2466 | 
+ 2467 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2468 |   if (showHolders) {
+ 2469 |   
+ 2470 |     loadHolders();
+      :     ^^^^^|^^^^^
+      :          `-- Avoid calling setState() directly within an effect
+ 2471 |   }
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2476:7]
+ 2473 | 
+ 2474 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2475 |     if (showDrivers) {
+ 2476 |       loadDrivers();
+      :       ^^^^^|^^^^^
+      :            `-- Avoid calling setState() directly within an effect
+ 2477 |       loadCompanies();
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2485:7]
+ 2480 | 
+ 2481 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2482 |     if (showDevices) {
+ 2483 |       loadDevices();
+ 2484 |       loadCompanies();
+ 2485 |       loadDrivers();
+      :       ^^^^^|^^^^^
+      :            `-- Avoid calling setState() directly within an effect
+ 2486 |     }
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2497:5]
+ 2494 | 
+ 2495 | useEffect(() => {
+      : ^^^^|^^^^
+      :     `-- This is the containing effect
+ 2496 |   if (showPermissions) {
+ 2497 |     loadRoles();
+      :     ^^^^|^^^^
+      :         `-- Avoid calling setState() directly within an effect
+ 2498 |   }
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2503:7]
+ 2500 | 
+ 2501 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2502 |     if (showSms) {
+ 2503 |       loadSms();
+      :       ^^^|^^^
+      :          `-- Avoid calling setState() directly within an effect
+ 2504 |       loadCompanies();
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2513:5]
+ 2509 | 
+ 2510 | useEffect(() => {
+      : ^^^^|^^^^
+      :     `-- This is the containing effect
+ 2511 |   if (loggedIn) {
+ 2512 |     loadCompanies();
+ 2513 |     loadDashboardCompanies();
+      :     ^^^^^^^^^^^|^^^^^^^^^^
+      :                `-- Avoid calling setState() directly within an effect
+ 2514 |     loadDrivers();
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+      ,-[src/App.tsx:2522:27]
+ 2520 |   
+ 2521 |   useEffect(() => {
+      :   ^^^^|^^^^
+      :       `-- This is the containing effect
+ 2522 |     if (showMarketplaces) loadMarketplaces();
+      :                           ^^^^^^^^|^^^^^^^
+      :                                   `-- Avoid calling setState() directly within an effect
+ 2523 |   }, [showMarketplaces, marketplaceCompanyFilter]);
+      `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'loadCompanies'
+      ,-[src/App.tsx:2452:6]
+ 2449 |     if (showCompanies) {
+ 2450 |       loadCompanies();
+      :       ^^^^^^|^^^^^^
+      :             `-- useEffect uses `loadCompanies` here
+ 2451 |     }
+ 2452 |   }, [showCompanies, companiesPage]);
+      :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 2453 | 
+      `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'loadCompanies'
+      ,-[src/App.tsx:2479:6]
+ 2476 |       loadDrivers();
+ 2477 |       loadCompanies();
+      :       ^^^^^^|^^^^^^
+      :             `-- useEffect uses `loadCompanies` here
+ 2478 |     }
+ 2479 |   }, [showDrivers]);
+      :      ^^^^^^^^^^^^^
+ 2480 | 
+      `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has missing dependencies: 'loadDevices', and 'loadCompanies'
+      ,-[src/App.tsx:2487:6]
+ 2482 |     if (showDevices) {
+ 2483 |       loadDevices();
+      :       ^^^^^^^^^^^
+ 2484 |       loadCompanies();
+      :       ^^^^^^^^^^^^^
+ 2485 |       loadDrivers();
+ 2486 |     }
+ 2487 |   }, [showDevices, devicesPage]);
+      :      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 2488 | 
+      `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has missing dependencies: 'loadSms', 'loadDevices', and 'loadCompanies'
+      ,-[src/App.tsx:2508:6]
+ 2502 |     if (showSms) {
+ 2503 |       loadSms();
+      :       ^^^^^^^
+ 2504 |       loadCompanies();
+      :       ^^^^^^^^^^^^^
+ 2505 |       loadDrivers();
+ 2506 |       loadDevices();
+      :       ^^^^^^^^^^^
+ 2507 |     }
+ 2508 |   }, [showSms, smsCompanyFilter, smsDeviceFilter, smsDriverFilter, smsReadFilter, smsSearch]);
+      :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 2509 | 
+      `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has missing dependencies: 'loadSms', 'loadDevices', and 'loadCompanies'
+      ,-[src/App.tsx:2519:4]
+ 2511 |   if (loggedIn) {
+ 2512 |     loadCompanies();
+      :     ^^^^^^^^^^^^^
+ 2513 |     loadDashboardCompanies();
+ 2514 |     loadDrivers();
+ 2515 |     loadDevices();
+      :     ^^^^^^^^^^^
+ 2516 |     loadDashboardDevices();
+ 2517 |     loadSms();
+      :     ^^^^^^^
+ 2518 |   }
+ 2519 | }, [loggedIn]);;
+      :    ^^^^^^^^^^
+ 2520 |   
+      `----
+  help: Either include it or remove the dependency array.
+
+  ! react-hooks(exhaustive-deps): React Hook useEffect has a missing dependency: 'loadMarketplaces'
+      ,-[src/App.tsx:2523:6]
+ 2521 |   useEffect(() => {
+ 2522 |     if (showMarketplaces) loadMarketplaces();
+      :                           ^^^^^^^^|^^^^^^^
+      :                                   `-- useEffect uses `loadMarketplaces` here
+ 2523 |   }, [showMarketplaces, marketplaceCompanyFilter]);
+      :      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 2524 | 
+      `----
+  help: Either include it or remove the dependency array.
+
+Found 17 warnings and 0 errors.
+Finished in 329ms on 3 files with 116 rules using 8 threads.

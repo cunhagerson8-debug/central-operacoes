@@ -16,6 +16,11 @@ export class UpdateCompanyDto {
 
   @IsOptional()
   @IsString()
+  @Length(1, 30)
+  code?: string;
+
+  @IsOptional()
+  @IsString()
   @Length(2, 150)
   legalName?: string;
 

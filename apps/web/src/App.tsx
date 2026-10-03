@@ -2,12 +2,24 @@ import { useEffect, useState, type FormEvent } from 'react';
 import * as XLSX from 'xlsx';
 import QRCode from 'qrcode';
 import './App.css';
+import { ThemeToggle } from './ThemeToggle';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+function formatCnpj(value: string) {
+  return value
+    .replace(/\D/g, '')
+    .slice(0, 14)
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2');
+}
 
 type Company = {
   id: string;
   name: string;
+  code?: string | null;
   legalName?: string;
   document?: string;
   documentType?: string;
@@ -22,6 +34,16 @@ companySize?: string;
 cnae?: string;
 businessActivity?: string;
 };
+
+function isInternalDocument(company: Company) {
+  return company.documentType === 'INTERNAL' || /^INT-/.test(company.document ?? '');
+}
+
+// Cadastros antigos sem `code` usam o valor de `document` sem o prefixo INT-.
+function getCompanyCode(company: Company) {
+  if (company.code) return company.code;
+  return isInternalDocument(company) ? (company.document ?? '').replace(/^INT-/, '') : '';
+}
 
 type Holder = {
   id: string;
@@ -167,6 +189,10 @@ const [newUserError, setNewUserError] = useState('');
   const [companiesLoading, setCompaniesLoading] = useState(false);
   const [companiesError, setCompaniesError] = useState('');
   const [showNewCompany, setShowNewCompany] = useState(false);
+  const [companyDevicesViewId, setCompanyDevicesViewId] = useState<string | null>(null);
+  const [companyMarketplacesViewId, setCompanyMarketplacesViewId] = useState<string | null>(null);
+  const [companySmsViewId, setCompanySmsViewId] = useState<string | null>(null);
+  const [companyHoldersViewId, setCompanyHoldersViewId] = useState<string | null>(null);
   const [holders, setHolders] = useState<Holder[]>([]);
   const [holderSearch, setHolderSearch] = useState('');
   const [selectedHolder, setSelectedHolder] = useState<Holder | null>(null);
@@ -183,18 +209,13 @@ const [holderEmail, setHolderEmail] = useState('');
   const [companyFormError, setCompanyFormError] = useState('');
   const [companiesSuccess, setCompaniesSuccess] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [companyCapitalSocial, setCompanyCapitalSocial] = useState('');
-const [companyTaxRegime, setCompanyTaxRegime] = useState('');
-const [companySize, setCompanySize] = useState('');
-const [companyCnae, setCompanyCnae] = useState('');
-const [companyBusinessActivity, setCompanyBusinessActivity] = useState('');
+  const [companyCode, setCompanyCode] = useState('');
+  const [companyDocumentType, setCompanyDocumentType] = useState('');
   const [companyLegalName, setCompanyLegalName] = useState('');
   const [companyDocument, setCompanyDocument] = useState('');
-  const [companyDocumentType, setCompanyDocumentType] = useState('CNPJ');
   const [companyHolderId, setCompanyHolderId] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
   
-  const [companyNotes, setCompanyNotes] = useState('');
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [driversLoading, setDriversLoading] = useState(false);
   const [driversError, setDriversError] = useState('');
@@ -223,14 +244,6 @@ function addCompanyDevice() {
     ...current,
     {
       phoneNumber: '',
-      imei: '',
-      manufacturer: '',
-      model: '',
-      androidVersion: '',
-      simCarrier: '',
-      connectionType: 'UNKNOWN',
-      status: 'ACTIVE',
-      notes: '',
     },
   ]);
 }
@@ -246,26 +259,10 @@ function removeCompanyDevice(index: number) {
   type CompanyDeviceForm = {
   id?: string;
   phoneNumber: string;
-  imei: string;
-  manufacturer: string;
-  model: string;
-  androidVersion: string;
-  simCarrier: string;
-  connectionType: 'UNKNOWN' | 'WIFI' | 'MOBILE';
-status: 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
-  notes: string;
 };
 const [companyDevices, setCompanyDevices] = useState<CompanyDeviceForm[]>([
   {
     phoneNumber: '',
-    imei: '',
-    manufacturer: '',
-    model: '',
-    androidVersion: '',
-    simCarrier: '',
-    connectionType: 'UNKNOWN',
-    status: 'ACTIVE',
-    notes: '',
   },
 ]);
 
@@ -281,14 +278,6 @@ const [companyDevices, setCompanyDevices] = useState<CompanyDeviceForm[]>([
   const [deviceFormError, setDeviceFormError] = useState('');
   const [deviceCompanyId, setDeviceCompanyId] = useState('');
   const [devicePhoneNumber, setDevicePhoneNumber] = useState('');
-  const [deviceImei, setDeviceImei] = useState('');
-  const [deviceManufacturer, setDeviceManufacturer] = useState('');
-  const [deviceModel, setDeviceModel] = useState('');
-  const [deviceAndroidVersion, setDeviceAndroidVersion] = useState('');
-  const [deviceSimCarrier, setDeviceSimCarrier] = useState('');
-  const [deviceConnectionType, setDeviceConnectionType] = useState<'WIFI' | 'MOBILE' | 'UNKNOWN'>('UNKNOWN');
-  const [deviceStatus, setDeviceStatus] = useState<'ACTIVE' | 'INACTIVE' | 'BLOCKED'>('ACTIVE');
-  const [deviceNotes, setDeviceNotes] = useState('');
   const [showUsers, setShowUsers] = useState(false);
   const [showHolders, setShowHolders] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
@@ -314,8 +303,15 @@ const [usersError, setUsersError] = useState('');
   const [marketplaceFilter, setMarketplaceFilter] = useState('');
   const [marketplaceStatusFilter, setMarketplaceStatusFilter] = useState('');
   const marketplaceStatuses = ['ACTIVE', 'PENDING', 'DISCONNECTED', 'BLOCKED', 'ERROR', 'INACTIVE'] as const;
+  // Status que podem ser definidos manualmente. ACTIVE exige integração real (OAuth/API)
+  // e não pode ser declarado manualmente dentro do painel de Empresas.
+  const manualMarketplaceStatuses = marketplaceStatuses.filter(
+    (status) => status !== 'ACTIVE',
+  );
+  // Canais válidos na operação atual. Amazon foi convertida em Temu e Magalu está inativa no banco.
+  const allowedMarketplaceNames = ['Mercado Livre', 'Shopee', 'Temu', 'TikTok Shop'];
 
-  async function loadMarketplaces() {
+  async function loadMarketplaces(ignoreCompanyFilter = false) {
     const token = localStorage.getItem('accessToken');
     if (!token) { setLoggedIn(false); return; }
     setMarketplaceLoading(true);
@@ -337,7 +333,7 @@ const [usersError, setUsersError] = useState('');
     ? companiesData.data
     : [];
 
-const companyIds = marketplaceCompanyFilter
+const companyIds = marketplaceCompanyFilter && !ignoreCompanyFilter
   ? [marketplaceCompanyFilter]
   : companiesList.map((company) => company.id);
       const accountResponses = await Promise.all(companyIds.map((companyId) => fetch(`${API_URL}/companies/${companyId}/marketplaces`, { headers: { Authorization: `Bearer ${token}` } })));
@@ -350,7 +346,7 @@ const companyIds = marketplaceCompanyFilter
     }
   }
 
-  async function updateMarketplaceAccount(account: MarketplaceAccount, status: MarketplaceAccount['status']) {
+  async function updateMarketplaceAccount(account: MarketplaceAccount, status: MarketplaceAccount['status'], ignoreCompanyFilter = false) {
     const token = localStorage.getItem('accessToken');
     if (!token) { setLoggedIn(false); return; }
     await fetch(`${API_URL}/companies/${account.companyId}/marketplaces/${account.id}`, {
@@ -358,7 +354,42 @@ const companyIds = marketplaceCompanyFilter
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     });
-    await loadMarketplaces();
+    await loadMarketplaces(ignoreCompanyFilter);
+  }
+
+  async function createCompanyMarketplaceAccount(companyId: string, marketplaceId: string) {
+    const token = localStorage.getItem('accessToken');
+    if (!token) { setLoggedIn(false); return; }
+
+    // Nunca duplicar: se o vínculo já existe, apenas recarrega os dados.
+    const alreadyLinked = marketplaceAccounts.some(
+      (account) => account.companyId === companyId && account.marketplaceId === marketplaceId,
+    );
+
+    if (alreadyLinked) {
+      await loadMarketplaces(true);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/companies/${companyId}/marketplaces`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        // Vínculo não significa integração real: nasce sempre INACTIVE.
+        body: JSON.stringify({ marketplaceId, status: 'INACTIVE' }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const message = Array.isArray(data?.message) ? data.message.join(' ') : data?.message;
+        throw new Error(message || 'Não foi possível vincular o marketplace.');
+      }
+
+      await loadMarketplaces(true);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Erro ao vincular marketplace.');
+    }
   }
 
 function isLocationStale(device: Device) {
@@ -1098,6 +1129,7 @@ if (!companyNumber || !companyName) {
           },
           body: JSON.stringify({
             name: companyName,
+            code: companyNumber,
             legalName: companyName,
             document: `INT-${companyNumber}`,
             documentType: 'INTERNAL',
@@ -1360,9 +1392,11 @@ async function confirmAiMarketplaceImport() {
     for (const company of aiImportPreview.companies) {
       const companyNumber = String(company.number || '').trim();
 
-      const existingCompany = dashboardCompanies.find(
-        (item) => item.document === `INT-${companyNumber}`,
-      );
+      const existingCompany =
+        dashboardCompanies.find((item) => item.code === companyNumber) ??
+        dashboardCompanies.find(
+          (item) => item.document === `INT-${companyNumber}`,
+        );
 
       if (!existingCompany) {
         failed++;
@@ -1996,14 +2030,6 @@ async function loadDashboardDevices() {
     setEditingDeviceId(null);
     setDeviceCompanyId('');
     setDevicePhoneNumber('');
-    setDeviceImei('');
-    setDeviceManufacturer('');
-    setDeviceModel('');
-    setDeviceAndroidVersion('');
-    setDeviceSimCarrier('');
-    setDeviceConnectionType('UNKNOWN');
-    setDeviceStatus('ACTIVE');
-    setDeviceNotes('');
     setDeviceFormError('');
   }
 
@@ -2011,14 +2037,6 @@ async function loadDashboardDevices() {
     setEditingDeviceId(device.id);
     setDeviceCompanyId(device.companyId);
     setDevicePhoneNumber(device.phoneNumber || '');
-    setDeviceImei(device.imei || '');
-    setDeviceManufacturer(device.manufacturer || '');
-    setDeviceModel(device.model || '');
-    setDeviceAndroidVersion(device.androidVersion || '');
-    setDeviceSimCarrier(device.simCarrier || '');
-    setDeviceConnectionType(device.connectionType);
-    setDeviceStatus(device.status);
-    setDeviceNotes(device.notes || '');
     setDeviceFormError('');
     setShowDeviceForm(true);
     
@@ -2111,14 +2129,6 @@ if (qrWindow) {
           body: JSON.stringify({
             companyId: deviceCompanyId,
             phoneNumber: devicePhoneNumber.trim() || undefined,
-            imei: deviceImei.trim() || undefined,
-            manufacturer: deviceManufacturer.trim() || undefined,
-            model: deviceModel.trim() || undefined,
-            androidVersion: deviceAndroidVersion.trim() || undefined,
-            simCarrier: deviceSimCarrier.trim() || undefined,
-            connectionType: deviceConnectionType,
-            status: deviceStatus,
-            notes: deviceNotes.trim() || undefined,
           }),
         },
       );
@@ -2132,11 +2142,316 @@ if (qrWindow) {
       resetDeviceForm();
       setShowDeviceForm(false);
       await loadDevices();
+      await loadDashboardDevices();
     } catch (err) {
       setDeviceFormError(err instanceof Error ? err.message : 'Erro ao salvar aparelho.');
     } finally {
       setDeviceFormLoading(false);
     }
+  }
+
+  function toggleCompanyDevicesPanel(companyId: string) {
+    setCompanyDevicesViewId((current) => {
+      const next = current === companyId ? null : companyId;
+      resetDeviceForm();
+      setShowDeviceForm(false);
+      return next;
+    });
+  }
+
+  function toggleCompanyMarketplacesPanel(companyId: string) {
+    setCompanyMarketplacesViewId((current) => {
+      const next = current === companyId ? null : companyId;
+
+      if (next) {
+        loadMarketplaces(true);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleCompanySmsPanel(companyId: string) {
+    setCompanySmsViewId((current) => {
+      const next = current === companyId ? null : companyId;
+
+      if (next) {
+        loadSms();
+      }
+
+      return next;
+    });
+  }
+
+  function toggleCompanyHoldersPanel(companyId: string) {
+    setCompanyHoldersViewId((current) => {
+      const next = current === companyId ? null : companyId;
+
+      if (next) {
+        loadHolders();
+      }
+
+      return next;
+    });
+  }
+
+  function renderDeviceForm() {
+    return (
+      <section className="welcome-card">
+        <h3>{editingDeviceId ? 'Editar aparelho' : 'Novo aparelho'}</h3>
+        <form onSubmit={handleSaveDevice}>
+          <label htmlFor="device-company">Empresa *</label>
+          <select id="device-company" value={deviceCompanyId} onChange={(event) => setDeviceCompanyId(event.target.value)} required>
+            <option value="">Selecione uma empresa</option>
+            {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+          </select>
+
+          <label htmlFor="device-phone">Número do celular</label>
+          <input id="device-phone" value={devicePhoneNumber} onChange={(event) => setDevicePhoneNumber(event.target.value)} />
+          {deviceFormError && <div className="error-message">{deviceFormError}</div>}
+          <button type="submit" disabled={deviceFormLoading}>{deviceFormLoading ? 'Salvando...' : 'Salvar Aparelho'}</button>
+          <button type="button" className="logout-button" onClick={() => { resetDeviceForm(); setShowDeviceForm(false); }}>Cancelar</button>
+        </form>
+      </section>
+    );
+  }
+
+  function renderDeviceRow(device: Device) {
+    const currentStatus = device.currentStatus;
+    const battery = currentStatus?.batteryLevel;
+    return (
+      <div className="company-row device-row" key={device.id}>
+        <div>
+          <strong>{device.model || device.manufacturer || 'Aparelho sem modelo'}</strong>
+          <span>{device.phoneNumber || device.imei || 'Identificador não informado'}</span>
+          <span>Empresa: {device.company?.name || 'Não vinculada'}</span>
+          <span>Última comunicação: {currentStatus?.lastSeenAt ? new Date(currentStatus.lastSeenAt).toLocaleString('pt-BR') : 'Nunca'}</span>
+          <span>
+            Localização: {currentStatus?.lastLatitude !== null && currentStatus?.lastLatitude !== undefined && currentStatus?.lastLongitude !== null && currentStatus?.lastLongitude !== undefined
+              ? `${currentStatus.lastLatitude}, ${currentStatus.lastLongitude}`
+              : 'Não disponível'}
+            {' • '}
+            {currentStatus?.lastLocationAt ? new Date(currentStatus.lastLocationAt).toLocaleString('pt-BR') : 'Nunca'}
+          </span>
+          <span>
+            SMS: {device._count?.smsMessages ?? 0}
+            {device.smsMessages?.[0] ? ` • Último: ${device.smsMessages[0].sender} - ${device.smsMessages[0].message}` : ''}
+          </span>
+        </div>
+        <div className="device-row-meta">
+          <div className="device-row-status">
+          <span className={currentStatus?.isOnline ? 'device-online' : 'device-offline'}>{currentStatus?.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+          <span>{battery ?? '--'}% {currentStatus?.isCharging ? '• Carregando' : ''}</span>
+          <span className={`battery-${device.batterySurvivalStatus.toLowerCase()}`}>{device.batterySurvivalStatus}</span>
+          <span className={isLocationStale(device) ? 'device-offline' : 'device-online'}>
+            {isLocationStale(device) ? 'LOCALIZAÇÃO DESATUALIZADA' : 'LOCALIZAÇÃO ATUALIZADA'}
+          </span>
+          </div>
+          <div className="device-row-actions">
+          <button
+            className="new-company-button"
+            onClick={() => openDeviceLocation(device)}
+            >
+            Ver localização
+          </button>
+          <button
+            className="new-company-button"
+            onClick={() => {
+              setSmsDeviceFilter(device.id);
+              setShowSms(true);
+            }}
+          >
+            Ver SMS
+          </button>
+
+          <button
+            className="new-company-button"
+            onClick={() => activateDeviceAgent(device)}
+          >
+            Ativar Agent
+          </button>
+
+          <button className="new-company-button" onClick={() => editDevice(device)}>Editar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderCompanyMarketplacesPanel(company: Company) {
+    const validMarketplaces = marketplaces.filter(
+      (marketplace) =>
+        marketplace.active && allowedMarketplaceNames.includes(marketplace.name),
+    );
+
+    const companyAccounts = marketplaceAccounts.filter(
+      (account) =>
+        account.companyId === company.id &&
+        allowedMarketplaceNames.includes(account.marketplace?.name ?? ''),
+    );
+
+    return (
+      <section className="welcome-card company-devices-panel">
+        <div className="companies-title">
+          <div>
+            <span className="badge">MARKETPLACES</span>
+            <h3>Marketplaces de {company.name}</h3>
+            <p>Aptidão operacional desta empresa por canal.</p>
+          </div>
+        </div>
+
+        {marketplaceLoading && <p>Carregando marketplaces...</p>}
+        {marketplaceError && <div className="error-message">{marketplaceError}</div>}
+
+        {!marketplaceLoading && !marketplaceError && validMarketplaces.length === 0 && (
+          <p>Nenhum marketplace válido disponível.</p>
+        )}
+
+        {!marketplaceLoading && !marketplaceError && validMarketplaces.length > 0 && (
+          <div className="marketplace-grid">
+            {validMarketplaces.map((marketplace) => {
+              const account = companyAccounts.find(
+                (item) => item.marketplaceId === marketplace.id,
+              );
+
+              return (
+                <div className="marketplace-cell" key={marketplace.id}>
+                  <strong>{marketplace.name}</strong>
+                  <span className={`marketplace-status marketplace-${(account?.status || 'INACTIVE').toLowerCase()}`}>
+                    {account?.status || 'INACTIVE'}
+                  </span>
+                  {account ? (
+                    <select
+                      value={account.status}
+                      onChange={(event) =>
+                        updateMarketplaceAccount(
+                          account,
+                          event.target.value as MarketplaceAccount['status'],
+                          true,
+                        )
+                      }
+                    >
+                      {/* Registros legados em ACTIVE preservam o status atual, mas ACTIVE
+                          não pode ser declarado manualmente sem integração real. */}
+                      {account.status === 'ACTIVE' && (
+                        <option value="ACTIVE">ACTIVE</option>
+                      )}
+                      {manualMarketplaceStatuses.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      type="button"
+                      className="new-company-button"
+                      onClick={() => createCompanyMarketplaceAccount(company.id, marketplace.id)}
+                    >
+                      Vincular
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderCompanySmsPanel(company: Company) {
+    const companySms = smsMessages.filter(
+      (sms) => sms.device?.company?.id === company.id,
+    );
+
+    return (
+      <section className="welcome-card company-devices-panel">
+        <div className="companies-title">
+          <div>
+            <span className="badge">SMS</span>
+            <h3>SMS de {company.name}</h3>
+            <p>Mensagens recebidas pelos aparelhos desta empresa.</p>
+          </div>
+        </div>
+
+        {smsLoading && <p>Carregando SMS...</p>}
+        {smsError && <div className="error-message">{smsError}</div>}
+
+        {!smsLoading && !smsError && companySms.length === 0 && (
+          <p>Nenhum SMS encontrado para esta empresa.</p>
+        )}
+
+        {!smsLoading && !smsError && companySms.length > 0 && (
+          <div className="companies-list">
+            {companySms.map((sms) => (
+              <div className="company-row sms-row" key={sms.id}>
+                <div>
+                  <strong>{sms.sender}</strong>
+                  <span>{sms.message}</span>
+                  <span>
+                    Aparelho: {sms.device?.phoneNumber || 'Não informado'}
+                  </span>
+                  <span>{new Date(sms.receivedAt).toLocaleString('pt-BR')}</span>
+                </div>
+                <div className="device-row-meta">
+                  <span className={sms.readAt ? 'device-online' : 'device-offline'}>
+                    {sms.readAt ? 'LIDO' : 'NÃO LIDO'}
+                  </span>
+                  {!sms.readAt && (
+                    <button
+                      className="new-company-button"
+                      onClick={() => markSmsAsRead(sms.id)}
+                    >
+                      Marcar como lido
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderCompanyHoldersPanel(company: Company) {
+    const companyHolders = holders.filter(
+      (holder) => holder.id === company.holderId,
+    );
+
+    return (
+      <section className="welcome-card company-devices-panel">
+        <div className="companies-title">
+          <div>
+            <span className="badge">TITULARES</span>
+            <h3>Titulares de {company.name}</h3>
+            <p>Pessoa física responsável por esta empresa.</p>
+          </div>
+        </div>
+
+        {holdersLoading && <p>Carregando titulares...</p>}
+
+        {!holdersLoading && companyHolders.length === 0 && (
+          <p>Nenhum titular vinculado a esta empresa.</p>
+        )}
+
+        {!holdersLoading && companyHolders.length > 0 && (
+          <div className="companies-list">
+            {companyHolders.map((holder) => (
+              <div className="company-row" key={holder.id}>
+                <div>
+                  <strong>{holder.fullName || 'Titular sem nome'}</strong>
+                  <span>{holder.cpf || 'CPF não informado'}</span>
+                  <span>{holder.email || 'E-mail não informado'}</span>
+                  <span>{holder.phone || 'Telefone não informado'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    );
   }
 
   function resetDriverForm() {
@@ -2219,14 +2534,10 @@ if (qrWindow) {
 
   function resetCompanyForm() {
     setCompanyName('');
+    setCompanyCode('');
+    setCompanyDocumentType('');
     setCompanyLegalName('');
-    setCompanyCapitalSocial('');
-setCompanyTaxRegime('');
-setCompanySize('');
-setCompanyCnae('');
-setCompanyBusinessActivity('');
     setCompanyDocument('');
-    setCompanyDocumentType('CNPJ');
     setCompanyHolderId('');
     setHolderFullName('');
 setHolderCpf('');
@@ -2234,26 +2545,20 @@ setHolderPhone('');
 setHolderEmail('');
     setCompanyPhone('');
     
-    setCompanyNotes('');
     setCompanyFormError('');
   }
 
 function editCompany(company: Company) {
   setEditingCompanyId(company.id);
   setCompanyName(company.name || '');
+  setCompanyCode(getCompanyCode(company));
+  setCompanyDocumentType(company.documentType || '');
   setCompanyLegalName(company.legalName || '');
-  setCompanyDocument(company.document || '');
-  setCompanyDocumentType(company.documentType || 'CNPJ');
+  setCompanyDocument(isInternalDocument(company) ? '' : company.document || '');
   setCompanyHolderId(company.holderId || '');
   setCompanyPhone(company.phone || '');
   
-  setCompanyNotes(company.notes || '');
   setCompanyFormError('');
-  setCompanyCapitalSocial(company.capitalSocial?.toString() || '');
-setCompanyTaxRegime(company.taxRegime || '');
-setCompanySize(company.companySize || '');
-setCompanyCnae(company.cnae || '');
-setCompanyBusinessActivity(company.businessActivity || '');
   setShowNewCompany(true);
 }
 
@@ -2261,9 +2566,12 @@ setCompanyBusinessActivity(company.businessActivity || '');
     event.preventDefault();
     setCompanyFormError('');
 
-    if (!companyName.trim() || !companyDocument.trim()) {
+    if (
+      !companyName.trim() ||
+      (!companyDocument.trim() && companyDocumentType !== 'INTERNAL')
+    ) {
   setCompanyFormError(
-    'Preencha o nome e o documento da empresa.',
+    'Preencha o nome e o CNPJ da empresa.',
   );
   return;
 }
@@ -2338,18 +2646,13 @@ if (!editingCompanyId) {
         },
         body: JSON.stringify({
           name: companyName.trim(),
+          code: companyCode.trim() || undefined,
           legalName: companyLegalName.trim() || undefined,
-          document: companyDocument.trim(),
-          documentType: companyDocumentType,
+          document: companyDocument.trim() || undefined,
+          documentType: companyDocument.trim() ? 'CNPJ' : undefined,
           holderId: holderId,
           phone: companyPhone.trim() || undefined,
           email: holderEmail.trim() || undefined,
-          capitalSocial: companyCapitalSocial ? Number(companyCapitalSocial) : undefined,
-taxRegime: companyTaxRegime || undefined,
-companySize: companySize || undefined,
-cnae: companyCnae.trim() || undefined,
-businessActivity: companyBusinessActivity.trim() || undefined,
-          notes: companyNotes.trim() || undefined,
         }),
       });
 
@@ -2394,14 +2697,6 @@ for (let index = 0; index < companyDevices.length; index += 1) {
     body: JSON.stringify({
       companyId: newCompanyId,
       phoneNumber: device.phoneNumber.trim(),
-      imei: device.imei.trim() || undefined,
-      manufacturer: device.manufacturer.trim() || undefined,
-      model: device.model.trim() || undefined,
-      androidVersion: device.androidVersion.trim() || undefined,
-      simCarrier: device.simCarrier.trim() || undefined,
-      connectionType: device.connectionType,
-      status: device.status,
-      notes: device.notes.trim() || undefined,
     }),
   });
 
@@ -2590,7 +2885,8 @@ useEffect(() => {
             </div>
           </div>
 
-          <button
+          <ThemeToggle />
+<button
             className="logout-button"
             onClick={() => {
               resetCompanyForm();
@@ -2615,6 +2911,15 @@ useEffect(() => {
           <section className="welcome-card">
             <form onSubmit={handleCreateCompany}>
               <h3>🏢 Pessoa Jurídica</h3>
+              <label htmlFor="company-code">Código da empresa</label>
+              <input
+                id="company-code"
+                type="text"
+                value={companyCode}
+                onChange={(event) => setCompanyCode(event.target.value)}
+                maxLength={30}
+              />
+
               <label htmlFor="company-name">Nome da empresa *</label>
               <input
                 id="company-name"
@@ -2632,81 +2937,18 @@ useEffect(() => {
                 onChange={(event) => setCompanyLegalName(event.target.value)}
               />
 
-              <label htmlFor="company-capital-social">Capital Social</label>
-<input
-  id="company-capital-social"
-  type="number"
-  step="0.01"
-  min="0"
-  value={companyCapitalSocial}
-  onChange={(event) => setCompanyCapitalSocial(event.target.value)}
-  placeholder="Ex.: 500000,00"
-/>
-
-<label htmlFor="company-tax-regime">Regime Tributário</label>
-<select
-  id="company-tax-regime"
-  value={companyTaxRegime}
-  onChange={(event) => setCompanyTaxRegime(event.target.value)}
->
-  <option value="">Selecione</option>
-  <option value="Simples Nacional">Simples Nacional</option>
-  <option value="Lucro Presumido">Lucro Presumido</option>
-  <option value="Lucro Real">Lucro Real</option>
-  <option value="MEI">MEI</option>
-</select>
-
-<label htmlFor="company-size">Porte da Empresa</label>
-<select
-  id="company-size"
-  value={companySize}
-  onChange={(event) => setCompanySize(event.target.value)}
->
-  <option value="">Selecione</option>
-  <option value="MEI">MEI</option>
-  <option value="ME">Microempresa (ME)</option>
-  <option value="EPP">Empresa de Pequeno Porte (EPP)</option>
-  <option value="MEDIO">Médio Porte</option>
-  <option value="GRANDE">Grande Porte</option>
-</select>
-
-<label htmlFor="company-cnae">CNAE</label>
-<input
-  id="company-cnae"
-  type="text"
-  value={companyCnae}
-  onChange={(event) => setCompanyCnae(event.target.value)}
-  placeholder="Ex.: 47.89-0-99"
-/>
-
-<label htmlFor="company-business-activity">Atividade da Empresa</label>
-<input
-  id="company-business-activity"
-  type="text"
-  value={companyBusinessActivity}
-  onChange={(event) => setCompanyBusinessActivity(event.target.value)}
-  placeholder="Ex.: Comércio varejista de variedades"
-/>
-
-              <label htmlFor="company-document">Documento *</label>
+              <label htmlFor="company-document">
+                {companyDocumentType === 'INTERNAL' ? 'CNPJ' : 'CNPJ *'}
+              </label>
               <input
                 id="company-document"
                 type="text"
                 value={companyDocument}
-                onChange={(event) => setCompanyDocument(event.target.value)}
-                required
+                onChange={(event) => setCompanyDocument(formatCnpj(event.target.value))}
+                placeholder="00.000.000/0000-00"
+                maxLength={18}
+                required={companyDocumentType !== 'INTERNAL'}
               />
-
-              <label htmlFor="company-document-type">Tipo de documento *</label>
-              <select
-                id="company-document-type"
-                value={companyDocumentType}
-                onChange={(event) => setCompanyDocumentType(event.target.value)}
-                required
-              >
-                <option value="CNPJ">CNPJ</option>
-                <option value="CPF">CPF</option>
-              </select>
 
 <h3>👤 Pessoa Física</h3>
               <label htmlFor="company-holder-name">Nome do titular *</label>
@@ -2745,13 +2987,6 @@ useEffect(() => {
               />
 
              
-              <label htmlFor="company-notes">Observações</label>
-              <textarea
-                id="company-notes"
-                value={companyNotes}
-                onChange={(event) => setCompanyNotes(event.target.value)}
-                rows={4}
-              />
 <hr />
 
 <h3>Dados dos Celulares</h3>
@@ -2782,108 +3017,6 @@ useEffect(() => {
         updateCompanyDevice(index, 'phoneNumber', event.target.value)
       }
       required
-    />
-
-    <label htmlFor={`company-device-imei-${index}`}>
-      IMEI ou identificador
-    </label>
-    <input
-      id={`company-device-imei-${index}`}
-      type="text"
-      value={device.imei}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'imei', event.target.value)
-      }
-    />
-
-    <label htmlFor={`company-device-manufacturer-${index}`}>
-      Fabricante
-    </label>
-    <input
-      id={`company-device-manufacturer-${index}`}
-      type="text"
-      value={device.manufacturer}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'manufacturer', event.target.value)
-      }
-    />
-
-    <label htmlFor={`company-device-model-${index}`}>
-      Modelo
-    </label>
-    <input
-      id={`company-device-model-${index}`}
-      type="text"
-      value={device.model}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'model', event.target.value)
-      }
-    />
-
-    <label htmlFor={`company-device-android-${index}`}>
-      Versão Android
-    </label>
-    <input
-      id={`company-device-android-${index}`}
-      type="text"
-      value={device.androidVersion}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'androidVersion', event.target.value)
-      }
-    />
-
-    <label htmlFor={`company-device-carrier-${index}`}>
-      Operadora
-    </label>
-    <input
-      id={`company-device-carrier-${index}`}
-      type="text"
-      value={device.simCarrier}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'simCarrier', event.target.value)
-      }
-    />
-
-    <label htmlFor={`company-device-connection-${index}`}>
-      Tipo de conexão
-    </label>
-    <select
-      id={`company-device-connection-${index}`}
-      value={device.connectionType}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'connectionType', event.target.value)
-      }
-    >
-      <option value="UNKNOWN">Desconhecida</option>
-      <option value="WIFI">Wi-Fi</option>
-      <option value="MOBILE">Móvel</option>
-    </select>
-
-    <label htmlFor={`company-device-status-${index}`}>
-      Status do aparelho
-    </label>
-    <select
-      id={`company-device-status-${index}`}
-      value={device.status}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'status', event.target.value)
-      }
-    >
-      <option value="ACTIVE">Ativo</option>
-      <option value="INACTIVE">Inativo</option>
-      <option value="BLOCKED">Bloqueado</option>
-    </select>
-
-    <label htmlFor={`company-device-notes-${index}`}>
-      Observações do celular
-    </label>
-    <textarea
-      id={`company-device-notes-${index}`}
-      value={device.notes}
-      onChange={(event) =>
-        updateCompanyDevice(index, 'notes', event.target.value)
-      }
-      rows={3}
     />
   </div>
 ))}
@@ -2920,7 +3053,8 @@ useEffect(() => {
     
     return (
       <div className="dashboard-page">
-        <header className="dashboard-header"><div><div className="dashboard-logo">MIL</div><div><h1>Central de Operações</h1><span>Status de Marketplaces</span></div></div><button className="logout-button" onClick={() => setShowMarketplaces(false)}>← Início</button></header>
+        <header className="dashboard-header"><div><div className="dashboard-logo">MIL</div><div><h1>Central de Operações</h1><span>Status de Marketplaces</span></div></div><ThemeToggle />
+<button className="logout-button" onClick={() => setShowMarketplaces(false)}>← Início</button></header>
         <main className="dashboard-content">
           <section className="welcome-card"><span className="badge">OPERAÇÃO</span><h2>Marketplaces</h2><p>Aptidão operacional por empresa e canal.</p></section>
           <section className="device-metrics">
@@ -3012,7 +3146,8 @@ useEffect(() => {
               <span>Central de SMS</span>
             </div>
           </div>
-          <button className="logout-button" onClick={() => setShowSms(false)}>← Início</button>
+          <ThemeToggle />
+<button className="logout-button" onClick={() => setShowSms(false)}>← Início</button>
         </header>
 
         <main className="dashboard-content">
@@ -3149,7 +3284,8 @@ useEffect(() => {
               <span>Gestão de Aparelhos</span>
             </div>
           </div>
-          <button
+          <ThemeToggle />
+<button
             className="logout-button"
             onClick={() => {
               resetDeviceForm();
@@ -3211,112 +3347,14 @@ useEffect(() => {
             <div><strong>{staleLocationDevices}</strong><span>Sem localização recente</span></div>
           </section>
 
-          {showDeviceForm && (
-            <section className="welcome-card">
-              <h3>{editingDeviceId ? 'Editar aparelho' : 'Novo aparelho'}</h3>
-              <form onSubmit={handleSaveDevice}>
-                <label htmlFor="device-company">Empresa *</label>
-                <select id="device-company" value={deviceCompanyId} onChange={(event) => setDeviceCompanyId(event.target.value)} required>
-                  <option value="">Selecione uma empresa</option>
-                  {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
-                </select>
-
-                <label htmlFor="device-phone">Número do celular</label>
-                <input id="device-phone" value={devicePhoneNumber} onChange={(event) => setDevicePhoneNumber(event.target.value)} />
-                <label htmlFor="device-imei">IMEI ou identificador</label>
-                <input id="device-imei" value={deviceImei} onChange={(event) => setDeviceImei(event.target.value)} />
-                <label htmlFor="device-manufacturer">Fabricante</label>
-                <input id="device-manufacturer" value={deviceManufacturer} onChange={(event) => setDeviceManufacturer(event.target.value)} />
-                <label htmlFor="device-model">Modelo</label>
-                <input id="device-model" value={deviceModel} onChange={(event) => setDeviceModel(event.target.value)} />
-                <label htmlFor="device-android">Versão Android</label>
-                <input id="device-android" value={deviceAndroidVersion} onChange={(event) => setDeviceAndroidVersion(event.target.value)} />
-                <label htmlFor="device-carrier">Operadora</label>
-                <input id="device-carrier" value={deviceSimCarrier} onChange={(event) => setDeviceSimCarrier(event.target.value)} />
-
-                <label htmlFor="device-connection">Tipo de conexão</label>
-                <select id="device-connection" value={deviceConnectionType} onChange={(event) => setDeviceConnectionType(event.target.value as 'WIFI' | 'MOBILE' | 'UNKNOWN')}>
-                  <option value="UNKNOWN">Desconhecida</option>
-                  <option value="WIFI">Wi-Fi</option>
-                  <option value="MOBILE">Móvel</option>
-                </select>
-                <label htmlFor="device-status">Status operacional</label>
-                <select id="device-status" value={deviceStatus} onChange={(event) => setDeviceStatus(event.target.value as 'ACTIVE' | 'INACTIVE' | 'BLOCKED')}>
-                  <option value="ACTIVE">Ativo</option>
-                  <option value="INACTIVE">Inativo</option>
-                  <option value="BLOCKED">Bloqueado</option>
-                </select>
-                <label htmlFor="device-notes">Observações</label>
-                <textarea id="device-notes" value={deviceNotes} onChange={(event) => setDeviceNotes(event.target.value)} rows={4} />
-                {deviceFormError && <div className="error-message">{deviceFormError}</div>}
-                <button type="submit" disabled={deviceFormLoading}>{deviceFormLoading ? 'Salvando...' : 'Salvar Aparelho'}</button>
-                <button type="button" className="logout-button" onClick={() => { resetDeviceForm(); setShowDeviceForm(false); }}>Cancelar</button>
-              </form>
-            </section>
-          )}
+          {showDeviceForm && renderDeviceForm()}
 
           {devicesLoading && <section className="welcome-card"><p>Carregando aparelhos...</p></section>}
           {devicesError && <section className="welcome-card"><div className="error-message">{devicesError}</div></section>}
           {!devicesLoading && !devicesError && devices.length === 0 && <section className="welcome-card"><p>Nenhum aparelho cadastrado.</p></section>}
           {!devicesLoading && !devicesError && devices.length > 0 && (
             <section className="companies-list device-list">
-              {devices.map((device) => {
-                const currentStatus = device.currentStatus;
-                const battery = currentStatus?.batteryLevel;
-                return (
-                  <div className="company-row device-row" key={device.id}>
-                    <div>
-                      <strong>{device.model || device.manufacturer || 'Aparelho sem modelo'}</strong>
-                      <span>{device.phoneNumber || device.imei || 'Identificador não informado'}</span>
-                      <span>Empresa: {device.company?.name || 'Não vinculada'}</span>
-                      <span>Última comunicação: {currentStatus?.lastSeenAt ? new Date(currentStatus.lastSeenAt).toLocaleString('pt-BR') : 'Nunca'}</span>
-                      <span>
-                        Localização: {currentStatus?.lastLatitude !== null && currentStatus?.lastLatitude !== undefined && currentStatus?.lastLongitude !== null && currentStatus?.lastLongitude !== undefined
-                          ? `${currentStatus.lastLatitude}, ${currentStatus.lastLongitude}`
-                          : 'Não disponível'}
-                        {' • '}
-                        {currentStatus?.lastLocationAt ? new Date(currentStatus.lastLocationAt).toLocaleString('pt-BR') : 'Nunca'}
-                      </span>
-                      <span>
-                        SMS: {device._count?.smsMessages ?? 0}
-                        {device.smsMessages?.[0] ? ` • Último: ${device.smsMessages[0].sender} - ${device.smsMessages[0].message}` : ''}
-                      </span>
-                    </div>
-                    <div className="device-row-meta">
-                      <span className={currentStatus?.isOnline ? 'device-online' : 'device-offline'}>{currentStatus?.isOnline ? 'ONLINE' : 'OFFLINE'}</span>
-                      <span>{battery ?? '--'}% {currentStatus?.isCharging ? '• Carregando' : ''}</span>
-                      <span className={`battery-${device.batterySurvivalStatus.toLowerCase()}`}>{device.batterySurvivalStatus}</span>
-                      <span className={isLocationStale(device) ? 'device-offline' : 'device-online'}>
-                        {isLocationStale(device) ? 'LOCALIZAÇÃO DESATUALIZADA' : 'LOCALIZAÇÃO ATUALIZADA'}
-                      </span>
-                      <button
-                        className="new-company-button"
-                        onClick={() => openDeviceLocation(device)}
-                        >
-                        Ver localização
-                      </button>
-                      <button
-                        className="new-company-button"
-                        onClick={() => {
-                          setSmsDeviceFilter(device.id);
-                          setShowSms(true);
-                        }}
-                      >
-                        Ver SMS
-                      </button>
-
-<button
-  className="new-company-button"
-  onClick={() => activateDeviceAgent(device)}
->
-  Ativar Agent
-</button>
-
-                      <button className="new-company-button" onClick={() => editDevice(device)}>Editar</button>
-                    </div>
-                  </div>
-                );
-              })}
+              {devices.map((device) => renderDeviceRow(device))}
               <section className="companies-pagination">
   <span>
     Total: {devicesTotal} aparelhos
@@ -3369,7 +3407,8 @@ if (showUsers) {
           </div>
         </div>
 
-        <button
+        <ThemeToggle />
+<button
           className="logout-button"
           onClick={() => setShowUsers(false)}
         >
@@ -3566,7 +3605,8 @@ if (showPermissions) {
           </div>
         </div>
 
-        <button
+        <ThemeToggle />
+<button
           className="logout-button"
           onClick={() => setShowPermissions(false)}
         >
@@ -3644,7 +3684,8 @@ if (showHolders) {
           </div>
         </div>
 
-        <button
+        <ThemeToggle />
+<button
           className="logout-button"
           onClick={() => setShowHolders(false)}
         >
@@ -3912,7 +3953,8 @@ if (showHolders) {
               <span>Gestão de Motoristas</span>
             </div>
           </div>
-          <button
+          <ThemeToggle />
+<button
             className="logout-button"
             onClick={() => {
               resetDriverForm();
@@ -4082,7 +4124,8 @@ if (showAiImport) {
           </div>
         </div>
 
-        <button
+        <ThemeToggle />
+<button
           className="logout-button"
           onClick={() => setShowAiImport(false)}
         >
@@ -4114,7 +4157,7 @@ if (showAiImport) {
               marginTop: '20px',
               padding: '16px',
               borderRadius: '12px',
-              border: '1px solid #d8e0ea',
+              border: '1px solid var(--border)',
               boxSizing: 'border-box',
               resize: 'vertical',
               fontSize: '15px',
@@ -4157,9 +4200,9 @@ if (showAiImport) {
     style={{
       marginTop: '20px',
       padding: '20px',
-      border: '1px solid #d8e0ea',
+      border: '1px solid var(--border)',
       borderRadius: '12px',
-      background: '#ffffff',
+      background: 'var(--surface)',
     }}
   >
    
@@ -4178,7 +4221,7 @@ if (showAiImport) {
         display: 'inline-block',
         padding: '6px 10px',
         borderRadius: '999px',
-        background: '#e8f0ff',
+        background: 'var(--info-bg)',
         fontSize: '12px',
         fontWeight: 700,
         marginBottom: '10px',
@@ -4189,7 +4232,7 @@ if (showAiImport) {
 
     <h3 style={{ margin: 0 }}>Prévia da análise</h3>
 
-    <p style={{ margin: '6px 0 0', color: '#667085' }}>
+    <p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>
       Revise os dados antes de confirmar a importação.
     </p>
   </div>
@@ -4201,9 +4244,9 @@ if (showAiImport) {
       style={{
         marginBottom: '20px',
         padding: '16px',
-        border: '1px solid #d8e0ea',
+        border: '1px solid var(--border)',
         borderRadius: '12px',
-        background: '#f8fafc',
+        background: 'var(--surface-2)',
       }}
     >
       <div
@@ -4230,7 +4273,7 @@ if (showAiImport) {
         style={{
           maxHeight: '320px',
           overflowY: 'auto',
-          borderTop: '1px solid #e5e7eb',
+          borderTop: '1px solid var(--border)',
         }}
       >
         {aiImportPreview.companies.map(
@@ -4239,7 +4282,7 @@ if (showAiImport) {
               key={`${company.number}-${index}`}
               style={{
                 padding: '10px 4px',
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: '1px solid var(--border)',
               }}
             >
               <div style={{ fontWeight: 700 }}>
@@ -4249,7 +4292,7 @@ if (showAiImport) {
               <div
                 style={{
                   fontSize: '13px',
-                  color: '#667085',
+                  color: 'var(--muted)',
                   marginTop: '4px',
                 }}
               >
@@ -4259,7 +4302,7 @@ if (showAiImport) {
               <div
                 style={{
                   fontSize: '13px',
-                  color: '#667085',
+                  color: 'var(--muted)',
                   marginTop: '2px',
                 }}
               >
@@ -4319,42 +4362,42 @@ if (showAiImport) {
     gap: '14px',
   }}
 >
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>Empresa</strong>
     <div>{aiImportPreview.company || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>Beneficiário</strong>
     <div>{aiImportPreview.beneficiary || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>CNPJ/CPF da empresa</strong>
     <div>{aiImportPreview.document || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>CPF/CNPJ do beneficiário</strong>
     <div>{aiImportPreview.beneficiaryDocument || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>PIX</strong>
     <div>{aiImportPreview.pixKey || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>Pagamento</strong>
     <div>{aiImportPreview.paymentAmount || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>Marketplace</strong>
     <div>{aiImportPreview.marketplace || 'Não identificado'}</div>
   </div>
 
-  <div style={{ padding: '14px', border: '1px solid #e5e7eb', borderRadius: '10px' }}>
+  <div style={{ padding: '14px', border: '1px solid var(--border)', borderRadius: '10px' }}>
     <strong>Celular</strong>
     <div>{aiImportPreview.phone || 'Não identificado'}</div>
   </div>
@@ -4385,7 +4428,8 @@ if (showPayments) {
           </div>
         </div>
 
-        <button
+        <ThemeToggle />
+<button
           className="logout-button"
           onClick={() => setShowPayments(false)}
         >
@@ -4699,6 +4743,7 @@ const pendingCompanies = dashboardCompanies.filter((company) => {
             </div>
           </div>
 
+<ThemeToggle />
 <button
   type="button"
   className="logout-button"
@@ -4759,40 +4804,130 @@ const pendingCompanies = dashboardCompanies.filter((company) => {
 )}
 
 {!companiesLoading && !companiesError && companies.length > 0 && (
-  <section className="companies-list">
-    {companies.map((company) => (
-      <div className="company-row" key={company.id}>
-        <div>
-          <strong>{company.name}</strong>
+  <section className="companies-list company-cards-grid">
+    {companies.map((company) => {
+      const companyDevices = dashboardDevices.filter(
+        (device) => device.companyId === company.id,
+      );
+      const isDevicesPanelOpen = companyDevicesViewId === company.id;
+      const isMarketplacesPanelOpen = companyMarketplacesViewId === company.id;
+      const isSmsPanelOpen = companySmsViewId === company.id;
+      const isHoldersPanelOpen = companyHoldersViewId === company.id;
 
-          <div>
-            {company.document || 'Documento não informado'}
+      return (
+        <div key={company.id} className={isDevicesPanelOpen || isMarketplacesPanelOpen || isSmsPanelOpen || isHoldersPanelOpen ? 'company-card-item company-card-item-open' : 'company-card-item'}>
+          <div className="company-row">
+            <div>
+              <strong>{company.name}</strong>
+
+              <div>
+                Código: {getCompanyCode(company) || 'Não informado'}
+              </div>
+
+              <div>
+                {isInternalDocument(company)
+                  ? 'CNPJ não informado'
+                  : company.document || 'Documento não informado'}
+              </div>
+
+              <div>
+                {company.phone || 'Telefone não informado'}
+              </div>
+
+              <div>
+                {company.email || 'E-mail não informado'}
+              </div>
+            </div>
+
+            <div>
+              <div className="company-status">
+                {company.status || 'ACTIVE'}
+              </div>
+
+              <button
+                type="button"
+                className="new-company-button"
+                onClick={() => editCompany(company)}
+              >
+                Editar
+              </button>
+
+              <button
+                type="button"
+                className="new-company-button"
+                onClick={() => toggleCompanyDevicesPanel(company.id)}
+              >
+                {isDevicesPanelOpen ? 'Ocultar Aparelhos' : `Aparelhos (${companyDevices.length})`}
+              </button>
+
+              <button
+                type="button"
+                className="new-company-button"
+                onClick={() => toggleCompanyMarketplacesPanel(company.id)}
+              >
+                {isMarketplacesPanelOpen ? 'Ocultar Marketplaces' : 'Marketplaces'}
+              </button>
+
+              <button
+                type="button"
+                className="new-company-button"
+                onClick={() => toggleCompanySmsPanel(company.id)}
+              >
+                {isSmsPanelOpen ? 'Ocultar SMS' : 'SMS'}
+              </button>
+
+              <button
+                type="button"
+                className="new-company-button"
+                onClick={() => toggleCompanyHoldersPanel(company.id)}
+              >
+                {isHoldersPanelOpen ? 'Ocultar Titulares' : 'Titulares'}
+              </button>
+            </div>
           </div>
 
-          <div>
-            {company.phone || 'Telefone não informado'}
-          </div>
+          {isDevicesPanelOpen && (
+            <section className="welcome-card company-devices-panel">
+              <div className="companies-title">
+                <div>
+                  <span className="badge">APARELHOS</span>
+                  <h3>Aparelhos de {company.name}</h3>
+                  <p>Aparelhos vinculados a esta empresa.</p>
+                </div>
 
-          <div>
-            {company.email || 'E-mail não informado'}
-          </div>
+                <button
+                  type="button"
+                  className="new-company-button"
+                  onClick={() => {
+                    resetDeviceForm();
+                    setDeviceCompanyId(company.id);
+                    setShowDeviceForm(true);
+                  }}
+                >
+                  + Vincular Aparelho
+                </button>
+              </div>
+
+              {showDeviceForm && renderDeviceForm()}
+
+              {companyDevices.length === 0 ? (
+                <p>Nenhum aparelho vinculado a esta empresa.</p>
+              ) : (
+                <div className="companies-list device-list">
+                  {companyDevices.map((device) => renderDeviceRow(device))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {isMarketplacesPanelOpen && renderCompanyMarketplacesPanel(company)}
+
+          {isSmsPanelOpen && renderCompanySmsPanel(company)}
+
+          {isHoldersPanelOpen && renderCompanyHoldersPanel(company)}
         </div>
-
-        <div>
-          <div className="company-status">
-            {company.status || 'ACTIVE'}
-          </div>
-
-          <button
-            type="button"
-            className="new-company-button"
-            onClick={() => editCompany(company)}
-          >
-            Editar
-          </button>
-        </div>
-      </div>
-    ))}
+      );
+    })}
   </section>
 )}
 
@@ -4952,7 +5087,8 @@ return (
           <span>{currentUser?.name ?? 'Usuário'}</span>
         </div>
 
-        <button
+        <ThemeToggle />
+<button
           className="logout-button"
           onClick={handleLogout}
         >
@@ -5265,44 +5401,19 @@ return (
       </section>
 
       <section className="modules-grid">
-        <button
-          className="module-card"
-          onClick={() => setShowCompanies(true)}
-        >
-          <strong>Empresas</strong>
-          <span>Gerenciar empresas cadastradas</span>
-        </button>
-
+       <button
+  className="module-card"
+  onClick={() => setShowCompanies(true)}
+>
+  <strong>Empresas</strong>
+  <span>Gerenciar empresas cadastradas</span>
+</button>
         <button
           className="module-card"
           onClick={() => setShowDrivers(true)}
         >
           <strong>Motoristas</strong>
           <span>Gerenciar agentes operacionais</span>
-        </button>
-
-        <button
-          className="module-card"
-          onClick={() => setShowDevices(true)}
-        >
-          <strong>Aparelhos</strong>
-          <span>Monitorar celulares e conectividade</span>
-        </button>
-
-        <button
-          className="module-card"
-          onClick={() => setShowSms(true)}
-        >
-          <strong>SMS</strong>
-          <span>Consultar mensagens dos aparelhos</span>
-        </button>
-
-        <button
-          className="module-card"
-          onClick={() => setShowMarketplaces(true)}
-        >
-          <strong>Marketplaces</strong>
-          <span>Monitorar status das contas</span>
         </button>
 
 <button
@@ -5327,14 +5438,6 @@ return (
 >
           <strong>Usuários</strong>
           <span>Gerenciar usuários e acessos</span>
-        </button>
-
-        <button
-  className="module-card"
-  onClick={() => setShowHolders(true)}
->
-          <strong>Titulares</strong>
-          <span>Consultar titulares cadastrados</span>
         </button>
 
         <button

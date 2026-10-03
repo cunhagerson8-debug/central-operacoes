@@ -132,6 +132,7 @@ model HolderDocument {
 model Company {
   id                  String                      @id @default(uuid()) @db.Uuid
   name                String
+  code                String?                     @unique
   legalName           String?                     @map("legal_name")
   document            String                      @unique
   documentType        DocumentType                @map("document_type")

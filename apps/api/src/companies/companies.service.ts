@@ -16,6 +16,12 @@ export class CompaniesService {
     ? {
         OR: [
           {
+            code: {
+              contains: term,
+              mode: 'insensitive' as const,
+            },
+          },
+          {
             name: {
               contains: term,
               mode: 'insensitive' as const,
@@ -30,6 +36,7 @@ export class CompaniesService {
           {
             document: {
               contains: term,
+              mode: 'insensitive' as const,
             },
           },
         ],
@@ -74,6 +81,7 @@ export class CompaniesService {
     return this.prisma.company.create({
       data: {
         name: dto.name,
+        code: dto.code?.trim() || undefined,
         legalName: dto.legalName,
         document: dto.document,
         documentType: dto.documentType,
@@ -111,6 +119,7 @@ businessActivity: dto.businessActivity,
       where: { id },
       data: {
         name: dto.name,
+        code: dto.code?.trim() || undefined,
         legalName: dto.legalName,
         document: dto.document,
         documentType: dto.documentType,
