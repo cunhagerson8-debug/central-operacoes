@@ -2813,6 +2813,17 @@ useEffect(() => {
   }
 }, [loggedIn]);;
   
+useEffect(() => {
+  if (!loggedIn) return;
+
+  const interval = window.setInterval(() => {
+    loadDevices();
+    loadDashboardDevices();
+  }, 30000);
+
+  return () => window.clearInterval(interval);
+}, [loggedIn]);
+
   useEffect(() => {
     if (showMarketplaces) loadMarketplaces();
   }, [showMarketplaces, marketplaceCompanyFilter]);
