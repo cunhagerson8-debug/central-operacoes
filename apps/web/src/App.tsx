@@ -208,7 +208,7 @@ const [holderEmail, setHolderEmail] = useState('');
   const [companyFormLoading, setCompanyFormLoading] = useState(false);
   const [companyFormError, setCompanyFormError] = useState('');
   const [companiesSuccess, setCompaniesSuccess] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  
   const [companyCode, setCompanyCode] = useState('');
   const [companyDocumentType, setCompanyDocumentType] = useState('');
   const [companyLegalName, setCompanyLegalName] = useState('');
@@ -2533,7 +2533,7 @@ if (qrWindow) {
   }
 
   function resetCompanyForm() {
-    setCompanyName('');
+    
     setCompanyCode('');
     setCompanyDocumentType('');
     setCompanyLegalName('');
@@ -2550,7 +2550,7 @@ setHolderEmail('');
 
 function editCompany(company: Company) {
   setEditingCompanyId(company.id);
-  setCompanyName(company.name || '');
+  
   setCompanyCode(getCompanyCode(company));
   setCompanyDocumentType(company.documentType || '');
   setCompanyLegalName(company.legalName || '');
@@ -2567,11 +2567,11 @@ function editCompany(company: Company) {
     setCompanyFormError('');
 
     if (
-      !companyName.trim() ||
+      !companyLegalName.trim() ||
       (!companyDocument.trim() && companyDocumentType !== 'INTERNAL')
     ) {
   setCompanyFormError(
-    'Preencha o nome e o CNPJ da empresa.',
+    'Preencha a razão social e o CNPJ da empresa.',
   );
   return;
 }
@@ -2645,7 +2645,7 @@ if (!editingCompanyId) {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: companyName.trim(),
+          name: companyLegalName.trim(),
           code: companyCode.trim() || undefined,
           legalName: companyLegalName.trim() || undefined,
           document: companyDocument.trim() || undefined,
@@ -2931,16 +2931,7 @@ useEffect(() => {
                 maxLength={30}
               />
 
-              <label htmlFor="company-name">Nome da empresa *</label>
-              <input
-                id="company-name"
-                type="text"
-                value={companyName}
-                onChange={(event) => setCompanyName(event.target.value)}
-                required
-              />
-
-              <label htmlFor="company-legal-name">Razão social</label>
+              <label htmlFor="company-legal-name">Razão social *</label>
               <input
                 id="company-legal-name"
                 type="text"
