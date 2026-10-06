@@ -2453,6 +2453,16 @@ if (qrWindow) {
                   <span>{holder.cpf || 'CPF não informado'}</span>
                   <span>{holder.email || 'E-mail não informado'}</span>
                   <span>{holder.phone || 'Telefone não informado'}</span>
+                  <button
+  type="button"
+  onClick={(event) => {
+    event.stopPropagation();
+    setSelectedHolder(holder);
+    loadHolderDocuments(holder.id);
+  }}
+>
+  📎 Documentos / Anexos
+</button>
                 </div>
               </div>
             ))}
