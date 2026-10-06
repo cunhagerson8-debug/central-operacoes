@@ -3019,7 +3019,7 @@ useEffect(() => {
       onChange={(event) =>
         updateCompanyDevice(index, 'phoneNumber', event.target.value)
       }
-      required
+      required={!editingCompanyId}
     />
   </div>
 ))}
