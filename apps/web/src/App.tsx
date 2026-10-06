@@ -2439,7 +2439,16 @@ if (qrWindow) {
         {!holdersLoading && companyHolders.length > 0 && (
           <div className="companies-list">
             {companyHolders.map((holder) => (
-              <div className="company-row" key={holder.id}>
+              <div
+  className="company-row"
+  key={holder.id}
+  onClick={() => {
+    setSelectedHolder(holder);
+    loadHolderDocuments(holder.id);
+    setShowHolders(true);
+  }}
+  style={{ cursor: 'pointer' }}
+>
                 <div>
                   <strong>{holder.fullName || 'Titular sem nome'}</strong>
                   <span>{holder.cpf || 'CPF não informado'}</span>
@@ -2568,6 +2577,7 @@ function editCompany(company: Company) {
     setCompanyFormError('');
 
     if (
+  !editingCompanyId &&
       !companyLegalName.trim() ||
       (!companyDocument.trim() && companyDocumentType !== 'INTERNAL')
     ) {
@@ -2581,7 +2591,7 @@ const hasValidDevice = companyDevices.some(
   (device) => device.phoneNumber.trim(),
 );
 
-if (!hasValidDevice) {
+if (!editingCompanyId && !hasValidDevice) {
   setCompanyFormError(
     'Cadastre pelo menos um celular com número.',
   );
