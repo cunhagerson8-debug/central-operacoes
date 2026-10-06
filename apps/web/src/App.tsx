@@ -2960,7 +2960,7 @@ useEffect(() => {
   type="text"
   value={holderFullName}
   onChange={(event) => setHolderFullName(event.target.value)}
-  required
+  required={!editingCompanyId}
 />
 
 <label htmlFor="company-holder-cpf">CPF do titular *</label>
@@ -2969,7 +2969,7 @@ useEffect(() => {
   type="text"
   value={holderCpf}
   onChange={(event) => setHolderCpf(event.target.value)}
-  required
+  required={!editingCompanyId}
 />
 
 
