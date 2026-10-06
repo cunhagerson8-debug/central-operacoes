@@ -2443,10 +2443,9 @@ if (qrWindow) {
   className="company-row"
   key={holder.id}
   onClick={() => {
-    setSelectedHolder(holder);
-    loadHolderDocuments(holder.id);
-    setShowHolders(true);
-  }}
+  setSelectedHolder(holder);
+  loadHolderDocuments(holder.id);
+}}
   style={{ cursor: 'pointer' }}
 >
                 <div>
@@ -2457,6 +2456,113 @@ if (qrWindow) {
                 </div>
               </div>
             ))}
+
+{selectedHolder && companyHolders.some((holder) => holder.id === selectedHolder.id) && (
+  <div className="welcome-card" style={{ marginTop: '16px' }}>
+    <h3>Documentos e Selfie</h3>
+
+    <p>
+      📷 Foto / Selfie:{' '}
+      <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+        Anexar foto
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              uploadHolderDocument(selectedHolder.id, file, 'SELFIE');
+            }
+          }}
+        />
+      </label>
+    </p>
+
+    <p>
+      🪪 Documento de identificação:{' '}
+      <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+        Anexar documento
+        <input
+          type="file"
+          accept="image/*,.pdf"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              uploadHolderDocument(selectedHolder.id, file, 'IDENTIFICATION');
+            }
+          }}
+        />
+      </label>
+    </p>
+
+    <p>
+      🏠 Comprovante de endereço:{' '}
+      <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+        Anexar comprovante
+        <input
+          type="file"
+          accept="image/*,.pdf"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              uploadHolderDocument(selectedHolder.id, file, 'ADDRESS_PROOF');
+            }
+          }}
+        />
+      </label>
+    </p>
+
+    <p>
+      📁 Outros documentos:{' '}
+      <label style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+        Anexar arquivo
+        <input
+          type="file"
+          accept="image/*,.pdf"
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              uploadHolderDocument(selectedHolder.id, file, 'OTHER');
+            }
+          }}
+        />
+      </label>
+    </p>
+
+    {holderDocuments.length > 0 && (
+      <div>
+        <h4>Arquivos anexados</h4>
+
+        {holderDocuments.map((doc) => (
+          <p key={doc.id}>
+            📎{' '}
+            <button
+              type="button"
+              onClick={() =>
+                downloadHolderDocument(selectedHolder.id, doc.id)
+              }
+              style={{
+                border: 'none',
+                background: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                color: 'inherit',
+              }}
+            >
+              {doc.name}
+            </button>
+          </p>
+        ))}
+      </div>
+    )}
+  </div>
+)}
+
           </div>
         )}
       </section>
