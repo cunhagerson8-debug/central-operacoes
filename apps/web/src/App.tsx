@@ -2544,6 +2544,7 @@ setHolderCpf('');
 setHolderPhone('');
 setHolderEmail('');
     setCompanyPhone('');
+    setCompanyDevices([{ phoneNumber: '' }]);
     
     setCompanyFormError('');
   }
