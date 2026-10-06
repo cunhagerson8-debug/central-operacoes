@@ -2686,7 +2686,7 @@ if (!newCompanyId) {
   throw new Error('A empresa foi criada, mas o sistema não retornou o ID.');
 }
 
-for (let index = 0; index < companyDevices.length; index += 1) {
+for (let index = 0; !editingCompanyId && index < companyDevices.length; index += 1) {
   const device = companyDevices[index];
 
   const deviceResponse = await fetch(`${API_URL}/devices`, {
